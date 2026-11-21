@@ -63,6 +63,14 @@ final class DeviceHub: ObservableObject {
 
     var guitarDevices: [AmpDevice] { devices }
 
+    /// 从后台回到前台：刷新 BLE MIDI 广播、补一次自动连接。
+    func onAppActive() {
+        if store.data.settings.korgBLEOutput ?? false {
+            bleMIDI.refreshAdvertising()
+        }
+        prepareAutoConnect()
+    }
+
     /// App 启动时静默尝试一次自动连接（音箱 + 踏板）。
     func prepareAutoConnect() {
         if let device = selectedDevice,

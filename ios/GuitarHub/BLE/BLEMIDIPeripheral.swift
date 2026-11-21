@@ -40,6 +40,16 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
         }
     }
 
+    /// 回前台时重新广播一次，促使 iPad 重新订阅通知。
+    func refreshAdvertising() {
+        guard wantAdvertising, let manager else { return }
+        manager.stopAdvertising()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self, self.wantAdvertising else { return }
+            self.publish()
+        }
+    }
+
     func stop() {
         wantAdvertising = false
         manager?.stopAdvertising()
