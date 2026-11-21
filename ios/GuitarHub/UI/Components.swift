@@ -125,13 +125,16 @@ struct ModuleBlock: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 Text(spec.badge)
                     .font(.system(size: 25, weight: .heavy, design: .rounded))
                 Text(spec.name)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                Text(enabled ? "ON" : "OFF")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .opacity(enabled ? 0.85 : 0.5)
             }
             .foregroundStyle(enabled ? Color.white : Color.white.opacity(0.32))
             .frame(maxWidth: .infinity)
