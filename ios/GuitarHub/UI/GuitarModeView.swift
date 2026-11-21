@@ -73,6 +73,7 @@ private struct GuitarDeviceView: View {
             VStack(spacing: 12) {
                 presetCard
                 moduleGrid
+                globalPanel
                 parameterPanel
             }
             .padding(14)
@@ -244,6 +245,47 @@ private struct GuitarDeviceView: View {
                             selectedModule = state.id
                         }
                     )
+                }
+            }
+        }
+    }
+
+    // MARK: - 全局模块（音量等）
+
+    @ViewBuilder
+    private var globalPanel: some View {
+        let globals = device.modules.filter { device.profile.module($0.id)?.isGlobal ?? false }
+        if !globals.isEmpty {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionTitle(text: "全局")
+                    ForEach(globals) { state in
+                        if let spec = device.profile.module(state.id) {
+                            Text(spec.name)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            ForEach(device.visibleParams(state.id)) { param in
+                                VStack(spacing: 2) {
+                                    HStack {
+                                        Text(param.name).font(.footnote)
+                                        Spacer()
+                                        Text("\(Int(device.value(state.id, param.id).rounded()))\(param.unit)")
+                                            .font(.footnote.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Slider(
+                                        value: Binding(
+                                            get: { device.value(state.id, param.id) },
+                                            set: { device.setParameter(state.id, param: param.id, value: $0) }
+                                        ),
+                                        in: param.minValue...param.maxValue,
+                                        step: max(param.step, 0.01)
+                                    )
+                                    .tint(Theme.accent)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
