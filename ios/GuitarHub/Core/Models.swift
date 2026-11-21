@@ -478,11 +478,14 @@ protocol DeviceCodec: AnyObject {
     func setModule(_ module: ModuleID, enabled: Bool)
     func setParameter(_ module: ModuleID, param: Int, value: Double)
     func tapTempo()
+    /// 直接发一个 CC（鼓机播放/停止这类瞬时命令用）。
+    func sendControlChange(_ number: Int, value: Int)
 }
 
 extension DeviceCodec {
     func requestState() {}
     func tapTempo() {}
+    func sendControlChange(_ number: Int, value: Int) {}
 }
 
 // MARK: - App 入口模式

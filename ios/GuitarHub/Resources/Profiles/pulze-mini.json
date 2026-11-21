@@ -142,10 +142,7 @@
       "name": "鼓机",
       "isGlobal": true,
       "bypass": {
-        "kind": "cc",
-        "cc": 60,
-        "onValue": 127,
-        "offValue": 0
+        "kind": "none"
       },
       "params": [
         {

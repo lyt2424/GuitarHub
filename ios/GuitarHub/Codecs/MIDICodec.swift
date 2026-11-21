@@ -123,6 +123,10 @@ final class MIDICodec: DeviceCodec {
         sendCC(cc, 127)
     }
 
+    func sendControlChange(_ number: Int, value: Int) {
+        sendCC(number, value)
+    }
+
     // MARK: - 发送
 
     private func sendCC(_ number: Int, _ value: Int) {

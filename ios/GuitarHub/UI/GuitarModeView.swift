@@ -239,32 +239,54 @@ private struct GuitarDeviceView: View {
     private var drumPanel: some View {
         if device.profile.module("drum") != nil, device.moduleState("drum") != nil {
             Card {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("鼓机").font(.headline)
                         Spacer()
-                        Toggle("", isOn: Binding(
-                            get: { device.isModuleEnabled("drum") },
-                            set: { device.setModule("drum", enabled: $0) }
-                        ))
-                        .labelsHidden()
-                        .tint(Theme.onColor)
-                    }
-
-                    HStack(spacing: 12) {
-                        Button {
-                            bumpDrumStyle()
-                        } label: {
-                            Label("下一个节奏", systemImage: "forward.end")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-
-                        Spacer()
-
                         Text("\(Int(device.value("drum", 0))) BPM")
                             .font(.footnote.monospacedDigit())
                             .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            device.sendCC(61, 127)
+                        } label: {
+                            Label("播放", systemImage: "play.fill")
+                                .font(.footnote.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.onColor)
+
+                        Button {
+                            device.sendCC(61, 0)
+                        } label: {
+                            Label("停止", systemImage: "stop.fill")
+                                .font(.footnote.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            bumpDrumStyle(-1)
+                        } label: {
+                            Label("上一个鼓机", systemImage: "backward.end")
+                                .font(.footnote.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            bumpDrumStyle(1)
+                        } label: {
+                            Label("下一个鼓机", systemImage: "forward.end")
+                                .font(.footnote.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
                     }
 
                     Slider(
@@ -281,10 +303,13 @@ private struct GuitarDeviceView: View {
         }
     }
 
-    private func bumpDrumStyle() {
-        let current = device.value("drum", 1)
-        let next = current >= 99 ? 0 : current + 1
-        device.setParameter("drum", param: 1, value: next)
+    /// 官方表里鼓机只有 CC67 风格号（0–99），用它实现“上一个 / 下一个鼓机”。
+    private func bumpDrumStyle(_ delta: Int) {
+        let current = Int(device.value("drum", 1))
+        var next = current + delta
+        if next < 0 { next = 99 }
+        if next > 99 { next = 0 }
+        device.setParameter("drum", param: 1, value: Double(next))
     }
 
     private var bluetoothHint: String {
