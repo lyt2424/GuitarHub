@@ -125,11 +125,11 @@ struct PedalBank: Codable, Identifiable, Hashable {
         PedalBank(
             name: "Pulze Mini",
             mappings: [
-                PedalMapping(trigger: .cc(number: 20), action: .ampModule(device: "pulze-mini", module: "eq")),
+                PedalMapping(trigger: .cc(number: 20), action: .ampModule(device: "pulze-mini", module: "dyn")),
                 PedalMapping(trigger: .cc(number: 21), action: .ampModule(device: "pulze-mini", module: "fx1")),
                 PedalMapping(trigger: .cc(number: 22), action: .ampModule(device: "pulze-mini", module: "fx2")),
                 PedalMapping(trigger: .cc(number: 23), action: .ampPresetStep(device: "pulze-mini", delta: 1)),
-                PedalMapping(trigger: .expression(number: 12), action: .ampParamFollow(device: "pulze-mini", module: "volume", param: 0))
+                PedalMapping(trigger: .cc(number: 24), action: .ampPresetStep(device: "pulze-mini", delta: -1))
             ]
         )
     }

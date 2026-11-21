@@ -27,6 +27,7 @@ targets:
           - "Resources"
       - path: GuitarHub/Resources/Profiles
         type: folder
+      - path: GuitarHub/Resources/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.guitarhub.app
@@ -35,6 +36,7 @@ targets:
         GENERATE_INFOPLIST_FILE: "NO"
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
 schemes:
   GuitarHub:

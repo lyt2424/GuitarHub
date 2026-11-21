@@ -4,6 +4,7 @@ import CoreBluetooth
 struct GuitarModeView: View {
     @EnvironmentObject private var hub: DeviceHub
     @State private var showSettings = false
+    @State private var showPedal = false
 
     var body: some View {
         NavigationStack {
@@ -45,6 +46,12 @@ struct GuitarModeView: View {
                         }
 
                         Button {
+                            showPedal = true
+                        } label: {
+                            Image(systemName: "shoe.2")
+                        }
+
+                        Button {
                             showSettings = true
                         } label: {
                             Image(systemName: "gearshape")
@@ -54,6 +61,9 @@ struct GuitarModeView: View {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView().environmentObject(hub)
+            }
+            .sheet(isPresented: $showPedal) {
+                PedalView().environmentObject(hub)
             }
         }
     }
