@@ -100,7 +100,26 @@ final class KorgController: ObservableObject {
         } else {
             midi.send([message], description: "PC ch\(channel) #\(value)")
         }
-        let description = useBLE ? "PC #\(value)（BLE）" : "PC ch\(channel) #\(value)"
-        lastSendDescription = description
+        lastSendDescription = useBLE ? "PC ch\(channel) #\(value)（BLE）" : "PC ch\(channel) #\(value)"
+    }
+
+    /// 依次在 1–16 通道发 PC 0，用来找出 Module 实际监听的通道。
+    func sweepChannels() {
+        let base = store.data.settings.korgPCBase ?? 0
+        for offset in 0..<16 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(offset) * 0.25) { [weak self] in
+                guard let self else { return }
+                let ch = offset + 1
+                let message = MIDIMessage.programChange(channel: ch, program: base)
+                let useBLE = (self.store.data.settings.korgBLEOutput ?? false)
+                    && (self.blePeripheral?.hasSubscribers ?? false)
+                if useBLE {
+                    self.blePeripheral?.send(message.bytes)
+                } else {
+                    self.midi.send([message], description: "扫描 ch\(ch)")
+                }
+                self.lastSendDescription = "扫描 ch\(ch) PC \(base)"
+            }
+        }
     }
 }

@@ -183,6 +183,10 @@ struct KorgScreen: View {
                     Text("在 iPad 的 Module → 设置 → Bluetooth MIDI 里找到并连接 “舞台Control MIDI”。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                    Text("最近发送：\(ble.lastPacket)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
                 } else {
                     HStack(spacing: 8) {
                         StatusDot(status: midi.isReady ? .connected : .failed("未就绪"))
@@ -207,8 +211,34 @@ struct KorgScreen: View {
                     }
                     Spacer(minLength: 0)
                 }
+
+                HStack(spacing: 8) {
+                    Text("MIDI 通道").font(.caption)
+                    Stepper("\(korg.channel)", value: Binding(
+                        get: { korg.channel },
+                        set: { updateChannel($0) }
+                    ), in: 1...16)
+                    .font(.caption)
+                }
+
+                HStack(spacing: 8) {
+                    Button("扫描 1–16 通道") { korg.sweepChannels() }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                    Spacer()
+                    Text(korg.lastSendDescription)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+    }
+
+    private func updateChannel(_ newValue: Int) {
+        guard var list = korg.setlist else { return }
+        list.midiChannel = newValue.clamped(to: 1...16)
+        store.updateKorgSetlist(list)
+        korg.refreshFromStore()
     }
 
     // MARK: - 音色表

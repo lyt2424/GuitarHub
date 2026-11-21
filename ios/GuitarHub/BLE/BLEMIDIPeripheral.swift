@@ -10,6 +10,7 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
     @Published private(set) var subscriberCount = 0
     @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var statusText = "未开启"
+    @Published private(set) var lastPacket = "—"
 
     var onLog: ((String) -> Void)?
 
@@ -76,6 +77,7 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
     func send(_ midi: [UInt8]) {
         guard let manager, let char = characteristic, !midi.isEmpty else { return }
         let data = BLEMIDI.encode(midi)
+        lastPacket = [UInt8](data).map { String(format: "%02X", $0) }.joined(separator: " ")
         let ok = manager.updateValue(data, for: char, onSubscribedCentrals: nil)
         if !ok {
             // 发送队列满：稍后重试一次
