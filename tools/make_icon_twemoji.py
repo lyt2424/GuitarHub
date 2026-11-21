@@ -43,9 +43,12 @@ def load_shape():
     body_pts = [p for p in points if p[1] > mid_y]
     bx, by = centroid(body_pts)
 
-    # 最远点 = 琴头，旋转到正上方
-    head = max(points, key=lambda p: (p[0] - bx) ** 2 + (p[1] - by) ** 2)
-    angle = math.atan2(head[1] - by, head[0] - bx)
+    # 用琴颈区域的重心确定方向，保证琴颈竖直
+    min_y_all = min(p[1] for p in points)
+    max_y_all = max(p[1] for p in points)
+    neck_pts = [p for p in points if p[1] <= min_y_all + (max_y_all - min_y_all) * 0.35]
+    nx, ny = centroid(neck_pts)
+    angle = math.atan2(ny - by, nx - bx)
     rot = -math.pi / 2 - angle
     cos_r, sin_r = math.cos(rot), math.sin(rot)
 
