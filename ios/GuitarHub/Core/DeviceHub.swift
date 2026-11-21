@@ -38,6 +38,7 @@ final class DeviceHub: ObservableObject {
 
         buildDevices()
         ensureBanks()
+        migrateBanks()
         pedal.attach(devices: devices)
         pedal.onFeedback = { [weak self] text in self?.pedal.lastEvent = text }
 
@@ -133,6 +134,16 @@ final class DeviceHub: ObservableObject {
         if banks.map(\.id) != store.data.pedalBanks.map(\.id) {
             store.data.pedalBanks = banks
         }
+    }
+
+    /// 旧版本把 CC20/21 绑成了别的动作；升级后一次性替换成新的默认映射。
+    private func migrateBanks() {
+        let key = "migration.banks.pulze.v2"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Pulze Mini" }) {
+            store.data.pedalBanks[index] = PedalBank.pulzeStarter()
+        }
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     private func makeDevice(profile: DeviceProfile) -> AmpDevice {

@@ -7,6 +7,19 @@ struct PedalView: View {
 
     private var bank: PedalBank? { hub.store.activeBank }
 
+    private func resetCurrentBank() {
+        guard let bank = hub.store.activeBank else { return }
+        var replacement: PedalBank
+        switch bank.name {
+        case "Pulze Mini":            replacement = PedalBank.pulzeStarter()
+        case "Spark Mini":            replacement = PedalBank.sparkStarter()
+        case BankNames.keyboard:      replacement = PedalBank.korgStarter()
+        default:                      replacement = bank
+        }
+        replacement.id = bank.id
+        hub.store.updateBank(replacement)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -26,6 +39,13 @@ struct PedalView: View {
                         ForEach(hub.store.data.pedalBanks) { item in
                             Text(item.name).tag(Optional(item.id))
                         }
+                    }
+
+                    Button {
+                        resetCurrentBank()
+                    } label: {
+                        Label("恢复这一组的默认映射", systemImage: "arrow.counterclockwise")
+                            .font(.footnote)
                     }
                 }
 
