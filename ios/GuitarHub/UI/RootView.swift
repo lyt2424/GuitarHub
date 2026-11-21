@@ -97,6 +97,7 @@ struct LaunchView: View {
             .sheet(isPresented: $showDevices) {
                 DeviceView().environmentObject(hub)
             }
+            .onAppear { hub.prepareAutoConnect() }
         }
     }
 }

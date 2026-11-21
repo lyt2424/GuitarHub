@@ -18,6 +18,7 @@ final class BLEMIDIPedal: ObservableObject {
 
     private let parser = MIDIStreamParser()
     private var bag = Set<AnyCancellable>()
+    private var rawPacketCount = 0
 
     init() {
         session.serviceFilter = [BLEMIDI.serviceUUID]
@@ -26,9 +27,20 @@ final class BLEMIDIPedal: ObservableObject {
         session.notifyCharacteristicUUID = BLEMIDI.characteristicUUID
         session.onData = { [weak self] data in
             guard let self else { return }
-            let bytes = BLEMIDI.decode(data)
+            let raw = [UInt8](data)
+            // 前几个包原样打出来，方便确认踏板到底有没有发数据。
+            if self.rawPacketCount < 6 {
+                self.rawPacketCount += 1
+                self.onLog?("踏板原始 \(raw.count)B: " + raw.map { String(format: "%02X", $0) }.joined(separator: " "))
+            }
+            let decoded = BLEMIDI.decode(data)
+            let bytes = decoded.isEmpty ? raw : decoded
             guard !bytes.isEmpty else { return }
-            for message in self.parser.feed(bytes) {
+            let messages = self.parser.feed(bytes)
+            if messages.isEmpty, !decoded.isEmpty {
+                self.onLog?("踏板数据未解析出完整 MIDI 消息")
+            }
+            for message in messages {
                 self.onMessage?(message)
             }
         }

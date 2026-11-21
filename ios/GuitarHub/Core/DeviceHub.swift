@@ -59,6 +59,18 @@ final class DeviceHub: ObservableObject {
 
     var guitarDevices: [AmpDevice] { devices }
 
+    /// App 启动时静默尝试一次自动连接（音箱 + 踏板）。
+    func prepareAutoConnect() {
+        if let device = selectedDevice,
+           !device.status.isConnected, !device.status.isBusy {
+            device.connectLast()
+        }
+        if UserDefaults.standard.string(forKey: "last.pedal") != nil,
+           !pedalInput.status.isConnected, !pedalInput.status.isBusy {
+            pedalInput.connectLast()
+        }
+    }
+
     func enterGuitar(_ id: DeviceProfileID) {
         selectedDeviceID = id
         UserDefaults.standard.set(id, forKey: "selected.device")
