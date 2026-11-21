@@ -158,6 +158,34 @@ struct GuitarModeView: View {
                             .background(Theme.cardHigh, in: Capsule())
                     }
                     .buttonStyle(.plain)
+
+                    if !device.candidates.isEmpty {
+                        VStack(spacing: 6) {
+                            ForEach(device.candidates) { candidate in
+                                Button {
+                                    device.connect(to: candidate.id)
+                                } label: {
+                                    HStack {
+                                        Text(candidate.name)
+                                            .font(.footnote.weight(.medium))
+                                        Spacer()
+                                        Text("\(candidate.rssi) dBm")
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 10)
+                                    .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    } else if device.isScanning {
+                        ProgressView().frame(maxWidth: .infinity)
+                    }
                 }
             }
         }
