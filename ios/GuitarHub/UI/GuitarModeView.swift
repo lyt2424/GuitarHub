@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 struct GuitarModeView: View {
     @EnvironmentObject private var hub: DeviceHub
@@ -99,12 +100,23 @@ struct GuitarModeView: View {
                     Text("预设 \(device.presetIndex + 1) / \(device.effectivePresetCount)")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .onTapGesture { showPresets = true }
                     Button {
                         showPresets = true
                     } label: {
                         Image(systemName: "list.bullet")
                             .font(.caption)
                     }
+                }
+
+                if !device.status.isConnected {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                        Text(bluetoothHint(device))
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 HStack(alignment: .firstTextBaseline) {
@@ -191,6 +203,26 @@ struct GuitarModeView: View {
         }
     }
 
+    private func bluetoothHint(_ device: AmpDevice) -> String {
+        switch device.bluetoothState {
+        case .poweredOn:
+            if device.isScanning {
+                return device.candidates.isEmpty
+                    ? "正在搜索附近蓝牙设备…（约 6 秒后改为全量扫描）"
+                    : "发现 \(device.candidates.count) 台设备，点名字连接"
+            }
+            return "点上方按钮开始搜索"
+        case .unauthorized:
+            return "蓝牙权限未开启：设置 → 隐私与安全性 → 蓝牙 → 吉他中枢"
+        case .poweredOff:
+            return "蓝牙已关闭，请在控制中心打开"
+        case .unsupported:
+            return "此设备不支持蓝牙"
+        default:
+            return "正在初始化蓝牙…"
+        }
+    }
+
     // MARK: - 颜色块
 
     private func moduleGrid(_ device: AmpDevice) -> some View {
@@ -210,8 +242,6 @@ struct GuitarModeView: View {
                             selectedModule = state.id
                         }
                     )
-                    .disabled(!device.status.isConnected)
-                    .opacity(device.status.isConnected ? 1 : 0.6)
                 }
             }
         }

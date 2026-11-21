@@ -6,10 +6,7 @@
   "transport": {
     "kind": "bleMIDI",
     "codec": "midiCC",
-    "namePrefixes": [
-      "Pulze",
-      "PULZE"
-    ],
+    "namePrefixes": [],
     "serviceUUIDs": [],
     "chunkSize": 20,
     "chunkIntervalMs": 6,

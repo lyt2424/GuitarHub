@@ -1,4 +1,5 @@
 import Foundation
+import CoreBluetooth
 import Combine
 
 /// 面向 UI 的单台设备状态容器：BLE 会话 + 协议编解码器 + 本地预设库。
@@ -11,6 +12,7 @@ final class AmpDevice: ObservableObject, Identifiable {
     private var bag = Set<AnyCancellable>()
 
     @Published private(set) var status: ConnectionStatus = .disconnected
+    @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var candidates: [DiscoveredDevice] = []
     @Published private(set) var profileText: String = ""
     @Published private(set) var isScanning: Bool = false
@@ -48,6 +50,10 @@ final class AmpDevice: ObservableObject, Identifiable {
         session.$discovered
             .receive(on: RunLoop.main)
             .sink { [weak self] value in self?.candidates = value }
+            .store(in: &bag)
+        session.$bluetoothState
+            .receive(on: RunLoop.main)
+            .sink { [weak self] value in self?.bluetoothState = value }
             .store(in: &bag)
         session.$profile
             .receive(on: RunLoop.main)

@@ -9,6 +9,7 @@ import Combine
 final class BLESession: NSObject, ObservableObject {
 
     @Published private(set) var status: ConnectionStatus = .disconnected
+    @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var discovered: [DiscoveredDevice] = []
     @Published private(set) var profile: String = ""
     @Published private(set) var connectedName: String?
@@ -222,6 +223,7 @@ extension BLESession: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         log("蓝牙状态：\(stateName(central.state))")
+        bluetoothState = central.state
         if central.state == .poweredOn, pendingScan {
             pendingScan = false
             startScan()
