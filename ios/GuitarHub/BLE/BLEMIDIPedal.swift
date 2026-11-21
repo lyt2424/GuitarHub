@@ -21,6 +21,9 @@ final class BLEMIDIPedal: ObservableObject {
 
     init() {
         session.serviceFilter = [BLEMIDI.serviceUUID]
+        // 显式锁定 BLE MIDI 特征，避免误连到踏板厂商的配置服务。
+        session.writeCharacteristicUUID = BLEMIDI.characteristicUUID
+        session.notifyCharacteristicUUID = BLEMIDI.characteristicUUID
         session.onData = { [weak self] data in
             guard let self else { return }
             let bytes = BLEMIDI.decode(data)
@@ -51,11 +54,18 @@ final class BLEMIDIPedal: ObservableObject {
     }
 
     func connectLast() {
-        if let raw = UserDefaults.standard.string(forKey: "last.pedal"),
-           let uuid = UUID(uuidString: raw) {
-            session.connect(to: uuid)
-        } else {
+        guard let raw = UserDefaults.standard.string(forKey: "last.pedal"),
+              let uuid = UUID(uuidString: raw) else {
             startScan()
+            return
+        }
+        session.connect(to: uuid)
+        // 记住的设备不在范围内时，2 秒后自动转扫描，免去手动操作。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            if !self.status.isConnected, !self.status.isBusy {
+                self.startScan()
+            }
         }
     }
 }

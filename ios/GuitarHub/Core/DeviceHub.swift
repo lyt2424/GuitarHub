@@ -110,6 +110,12 @@ final class DeviceHub: ObservableObject {
             store.data.activeBankID = bank.id
         }
 
+        // 踏板单独自动重连（和音箱是两条 BLE）。
+        if UserDefaults.standard.string(forKey: "last.pedal") != nil,
+           !pedalInput.status.isConnected, !pedalInput.status.isBusy {
+            pedalInput.connectLast()
+        }
+
         guard connect, let device = selectedDevice else { return }
         if !device.status.isConnected, !device.status.isBusy {
             device.connectLast()

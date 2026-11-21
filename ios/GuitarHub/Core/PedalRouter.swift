@@ -47,6 +47,18 @@ final class PedalRouter: ObservableObject {
             log(text)
             return
         }
+
+        // 没匹配上的消息也记一笔，方便排查踏板 CC 号是否正确。
+        switch message.type {
+        case 0xB0:
+            log("\(source) 收到未映射：CC \(message.data1) = \(message.data2)")
+        case 0xC0:
+            log("\(source) 收到未映射：PC \(message.data1)")
+        case 0x90 where message.data2 > 0:
+            log("\(source) 收到未映射：Note \(message.data1)")
+        default:
+            break
+        }
     }
 
     private func isContinuous(_ trigger: PedalTrigger) -> Bool {

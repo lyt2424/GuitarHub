@@ -113,11 +113,18 @@ final class AmpDevice: ObservableObject, Identifiable {
     }
 
     func connectLast() {
-        if let raw = UserDefaults.standard.string(forKey: "last.\(profile.id)"),
-           let uuid = UUID(uuidString: raw) {
-            session.connect(to: uuid)
-        } else {
+        guard let raw = UserDefaults.standard.string(forKey: "last.\(profile.id)"),
+              let uuid = UUID(uuidString: raw) else {
             startScan()
+            return
+        }
+        session.connect(to: uuid)
+        // 设备不在附近时，2 秒后自动转扫描。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            if !self.status.isConnected, !self.status.isBusy {
+                self.startScan()
+            }
         }
     }
 
