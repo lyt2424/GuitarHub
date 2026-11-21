@@ -115,29 +115,6 @@
       "colorHex": "#EC4899"
     },
     {
-      "id": "volume",
-      "name": "音量",
-      "isGlobal": true,
-      "bypass": {
-        "kind": "none"
-      },
-      "params": [
-        {
-          "id": 0,
-          "name": "音色音量",
-          "minValue": 0,
-          "maxValue": 100,
-          "defaultValue": 50,
-          "mapping": {
-            "kind": "cc",
-            "cc": 7
-          }
-        }
-      ],
-      "shortName": "VOL",
-      "colorHex": "#64748B"
-    },
-    {
       "id": "drum",
       "name": "鼓机",
       "isGlobal": true,

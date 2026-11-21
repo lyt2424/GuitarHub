@@ -69,6 +69,12 @@ private struct GuitarDeviceView: View {
     @State private var renaming = false
     @State private var draftName = ""
 
+    // 鼓机播放状态（设备不回报，只在本机记）
+    @State private var drumPlaying = false
+    // Tap 计速
+    @State private var tapTimes: [Date] = []
+    @State private var tappedBPM: Double?
+
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -213,7 +219,7 @@ private struct GuitarDeviceView: View {
     /// TAP 竖排：上面 TAP，下面当前 BPM。
     private var tapButton: some View {
         Button {
-            device.tapTempo()
+            handleTap()
         } label: {
             VStack(spacing: 1) {
                 Text("TAP")
@@ -229,8 +235,32 @@ private struct GuitarDeviceView: View {
     }
 
     private var bpmText: String {
+        if let tappedBPM {
+            return "\(Int(tappedBPM.rounded())) BPM"
+        }
         guard let drum = device.moduleState("drum") else { return "— BPM" }
         return "\(Int(drum.value(0, fallback: 120))) BPM"
+    }
+
+    /// 连点两下以上按间隔估算 BPM，并同步显示；同时照常发 Tap。
+    private func handleTap() {
+        let now = Date()
+        tapTimes.append(now)
+        if tapTimes.count > 6 { tapTimes.removeFirst(tapTimes.count - 6) }
+        if tapTimes.count >= 2 {
+            let intervals = zip(tapTimes.dropFirst(), tapTimes).map { pair in
+                pair.0.timeIntervalSince(pair.1)
+            }
+            let valid = intervals.filter { $0 > 0.2 && $0 < 2.0 }
+            if !valid.isEmpty {
+                let average = valid.reduce(0, +) / Double(valid.count)
+                let bpm = 60.0 / average
+                if bpm >= 40, bpm <= 300 {
+                    tappedBPM = bpm
+                }
+            }
+        }
+        device.tapTempo()
     }
 
     // MARK: - 鼓机
@@ -248,26 +278,17 @@ private struct GuitarDeviceView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    HStack(spacing: 10) {
-                        Button {
-                            device.sendCC(61, 127)
-                        } label: {
-                            Label("播放", systemImage: "play.fill")
-                                .font(.footnote.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.onColor)
-
-                        Button {
-                            device.sendCC(61, 0)
-                        } label: {
-                            Label("停止", systemImage: "stop.fill")
-                                .font(.footnote.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
+                    Button {
+                        drumPlaying.toggle()
+                        device.sendCC(61, drumPlaying ? 127 : 0)
+                    } label: {
+                        Label(drumPlaying ? "停止" : "播放",
+                              systemImage: drumPlaying ? "stop.fill" : "play.fill")
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(drumPlaying ? Theme.danger : Theme.onColor)
 
                     HStack(spacing: 10) {
                         Button {
@@ -289,18 +310,49 @@ private struct GuitarDeviceView: View {
                         .buttonStyle(.bordered)
                     }
 
-                    Slider(
-                        value: Binding(
-                            get: { device.value("drum", 0) },
-                            set: { device.setParameter("drum", param: 0, value: $0) }
-                        ),
-                        in: 40...300,
-                        step: 1
-                    )
-                    .tint(Theme.accent)
+                    HStack(spacing: 10) {
+                        Button {
+                            adjustTempo(-1)
+                        } label: {
+                            Image(systemName: "minus")
+                                .font(.footnote.weight(.bold))
+                                .frame(width: 34, height: 34)
+                                .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 9))
+                        }
+                        .buttonStyle(.plain)
+
+                        Slider(
+                            value: Binding(
+                                get: { device.value("drum", 0) },
+                                set: {
+                                    device.setParameter("drum", param: 0, value: $0)
+                                    tappedBPM = nil
+                                }
+                            ),
+                            in: 40...300,
+                            step: 1
+                        )
+                        .tint(Theme.accent)
+
+                        Button {
+                            adjustTempo(1)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.footnote.weight(.bold))
+                                .frame(width: 34, height: 34)
+                                .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 9))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
+    }
+
+    private func adjustTempo(_ delta: Double) {
+        let next = (device.value("drum", 0) + delta).clamped(to: 40...300)
+        device.setParameter("drum", param: 0, value: next)
+        tappedBPM = nil
     }
 
     /// 官方表里鼓机只有 CC67 风格号（0–99），用它实现“上一个 / 下一个鼓机”。
