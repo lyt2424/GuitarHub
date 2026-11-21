@@ -90,8 +90,10 @@ final class KorgController: ObservableObject {
     }
 
     private func sendPC(_ program: Int) {
-        let message = MIDIMessage.programChange(channel: channel, program: program)
-        let description = "PC ch\(channel) #\(program)"
+        let base = store.data.settings.korgPCBase ?? 0
+        let value = (program + base).clamped(to: 0...127)
+        let message = MIDIMessage.programChange(channel: channel, program: value)
+        let description = "PC ch\(channel) #\(value)"
         midi.send([message], description: description)
         lastSendDescription = description
     }

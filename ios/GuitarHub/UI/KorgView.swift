@@ -72,6 +72,21 @@ struct KorgScreen: View {
                     Button("刷新") { midi.refresh() }
                         .font(.caption)
                 }
+
+                // 快速测试：点 1–8 应让 Module 跳到 Set List 对应位置
+                HStack(spacing: 6) {
+                    ForEach(1...8, id: \.self) { number in
+                        Button("\(number)") {
+                            korg.select(program: number - 1)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 30, height: 30)
+                        .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 8))
+                        .buttonStyle(.plain)
+                    }
+                    Spacer(minLength: 0)
+                }
+
                 Text("在 KORG Module 里打开 Background Audio，并把 MIDI 输入选为 “GuitarHub”。如果 Module 的输入列表里没有这个端口，就先用本 App 控制音箱和踏板，Module 照常手动操作。")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

@@ -8,6 +8,8 @@ final class AppStore: ObservableObject {
     struct Settings: Codable, Hashable {
         var sparkPresetCount: Int = 4
         var korgChannel: Int = 1
+        /// KORG 的 Program Change 基准：0 或 1（有些 Set List 从 1 开始）。
+        var korgPCBase: Int? = nil
         var hapticsEnabled: Bool = true
         /// 召回音色时是否把本地保存的模块状态整包推给设备。
         var pushFullStateOnRecall: Bool = true

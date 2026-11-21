@@ -44,6 +44,15 @@ private struct SettingsContent: View {
                             set: { store.data.settings.korgChannel = $0.clamped(to: 1...16) }
                         ),
                         in: 1...16)
+
+                Picker("Program Change 基准", selection: Binding(
+                    get: { store.data.settings.korgPCBase ?? 0 },
+                    set: { store.data.settings.korgPCBase = $0 }
+                )) {
+                    Text("从 0 开始").tag(0)
+                    Text("从 1 开始").tag(1)
+                }
+                .pickerStyle(.segmented)
             } header: {
                 Text("KORG Module")
             } footer: {
@@ -61,6 +70,11 @@ private struct SettingsContent: View {
                 ForEach(midi.destinations) { endpoint in
                     Label(endpoint.name, systemImage: "arrow.right.circle")
                         .font(.caption)
+                }
+                ForEach(midi.sources) { endpoint in
+                    Label(endpoint.name, systemImage: "arrow.left.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 if midi.destinations.isEmpty {
                     Text("没有发现 MIDI 目的端口（Module 未运行或未提供虚拟端口）。")
