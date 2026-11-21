@@ -272,7 +272,7 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     /// 鼓机播放/停止之类的瞬时 CC。
     func sendCC(_ number: Int, _ value: Int) {
-        codec.sendControlChange(number, value)
+        codec.sendControlChange(number, value: value)
     }
 
     func requestState() {
