@@ -1,0 +1,171 @@
+{
+  "id": "pulze-mini",
+  "name": "Pulze Mini",
+  "vendor": "Hotone",
+  "note": "官方 MIDI 实现表（Firmware V1.0.6）：CC45-51 为七个块的开关，CC26/27 上下音色，CC7-10 音量，CC76 Tap Tempo。官方未开放单个效果参数，因此这里只做开关、音量与换音色。",
+  "transport": {
+    "kind": "bleMIDI",
+    "codec": "midiCC",
+    "namePrefixes": [
+      "Pulze",
+      "PULZE"
+    ],
+    "serviceUUIDs": [
+      "03B80E5A-EDE8-4B33-A751-6CE34EC4C700"
+    ],
+    "chunkSize": 20,
+    "chunkIntervalMs": 6,
+    "blockHeader": false,
+    "midiChannel": 1,
+    "tapTempoCC": 76
+  },
+  "capabilities": {
+    "stateReadback": false,
+    "presetNames": false,
+    "presetCount": 128,
+    "tapTempo": true,
+    "savePreset": false
+  },
+  "presets": {
+    "startNumber": 0,
+    "wrap": true
+  },
+  "modules": [
+    {
+      "id": "nr",
+      "name": "降噪",
+      "bypass": {
+        "kind": "cc",
+        "cc": 45,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "NR",
+      "colorHex": "#6B7280"
+    },
+    {
+      "id": "pre",
+      "name": "前级",
+      "bypass": {
+        "kind": "cc",
+        "cc": 46,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "PRE",
+      "colorHex": "#6366F1"
+    },
+    {
+      "id": "amp",
+      "name": "音箱",
+      "bypass": {
+        "kind": "cc",
+        "cc": 47,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "AMP",
+      "colorHex": "#EF4444"
+    },
+    {
+      "id": "cab",
+      "name": "箱体",
+      "bypass": {
+        "kind": "cc",
+        "cc": 48,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "CAB",
+      "colorHex": "#B45309"
+    },
+    {
+      "id": "eq",
+      "name": "均衡",
+      "bypass": {
+        "kind": "cc",
+        "cc": 49,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "EQ",
+      "colorHex": "#06B6D4"
+    },
+    {
+      "id": "fx1",
+      "name": "效果 1",
+      "bypass": {
+        "kind": "cc",
+        "cc": 50,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "FX1",
+      "colorHex": "#F59E0B"
+    },
+    {
+      "id": "fx2",
+      "name": "效果 2",
+      "bypass": {
+        "kind": "cc",
+        "cc": 51,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "shortName": "FX2",
+      "colorHex": "#EC4899"
+    },
+    {
+      "id": "volume",
+      "name": "音量",
+      "isGlobal": true,
+      "bypass": {
+        "kind": "none"
+      },
+      "params": [
+        {
+          "id": 0,
+          "name": "音色音量",
+          "minValue": 0,
+          "maxValue": 100,
+          "mapping": {
+            "kind": "cc",
+            "cc": 7
+          }
+        },
+        {
+          "id": 1,
+          "name": "乐器音量",
+          "minValue": 0,
+          "maxValue": 100,
+          "mapping": {
+            "kind": "cc",
+            "cc": 8
+          }
+        },
+        {
+          "id": 2,
+          "name": "蓝牙音量",
+          "minValue": 0,
+          "maxValue": 100,
+          "mapping": {
+            "kind": "cc",
+            "cc": 9
+          }
+        },
+        {
+          "id": 3,
+          "name": "辅助输入",
+          "minValue": 0,
+          "maxValue": 100,
+          "mapping": {
+            "kind": "cc",
+            "cc": 10
+          }
+        }
+      ],
+      "shortName": "VOL",
+      "colorHex": "#64748B"
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+import Foundation
+
+/// Spark Mini / 40 / GO 的控制编解码器。
+///
+/// 命令字（App → 音箱，均以 0x01 开头）：
+///   0x0115  模块开关      前缀字符串(模块名) + 0xC3/0xC2
+///   0x0104  参数修改      前缀字符串(模块名) + 参数号 + 浮点(0…1)
+///   0x0138  切换硬件预设  当前预设号 + 目标预设号
+///   0x0163  Tap Tempo     （待实机验证）
+/// 请求（0x02 开头）：
+///   0x0201  读取预设      预设号高/低字节 + 30 个 0；0x0100 表示"当前状态"
+///   0x0210  当前硬件预设号
+///   0x0211  音箱名
+///   0x0223  序列号
+///   0x022f  固件版本
+final class SparkCodec: DeviceCodec {
+
+    let profile: DeviceProfile
+    var eventHandler: ((TransportEvent) -> Void)?
+
+    private weak var session: BLESession?
+    private let decoder = SparkProtocol.Decoder()
+    private var sequence: UInt8 = 0
+    private var preset: SparkPreset?
+    private var pendingParams: [String: Double] = [:]
+
+    init(profile: DeviceProfile, session: BLESession) {
+        self.profile = profile
+        self.session = session
+    }
+
+    // MARK: - 生命周期
+
+    func didConnect() {
+        eventHandler?(.connected)
+        eventHandler?(.log("Spark 已连接，读取音箱信息与当前音色…"))
+        requestName()
+        requestPresetNumber()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.requestState()
+        }
+    }
+
+    func didDisconnect() {
+        eventHandler?(.disconnected(nil))
+    }
+
+    // MARK: - 接收
+
+    func didReceive(_ data: Data) {
+        let messages = decoder.feed([UInt8](data))
+        for message in messages {
+            handle(message)
+        }
+    }
+
+    private func handle(_ message: SparkProtocol.Message) {
+        switch message.cmdSub {
+        case 0x0101, 0x0301:
+            guard let parsed = SparkPresetParser.parse(message.payload) else {
+                eventHandler?(.log("预设解析失败（\(message.payload.count) 字节）"))
+                return
+            }
+            apply(parsed)
+
+        case 0x0311:
+            var reader = SparkPayloadReader(message.payload)
+            let name = reader.string()
+            if !name.isEmpty {
+                preset?.name = name
+                eventHandler?(.presetName(name))
+            }
+
+        case 0x0310, 0x0110:
+            var reader = SparkPayloadReader(message.payload)
+            let high = reader.byte() ?? 0
+            let low = reader.byte() ?? 0
+            let index = Int(high) << 8 | Int(low)
+            if index < 8 {
+                eventHandler?(.presetIndex(index))
+            }
+
+        case 0x0115, 0x0315:
+            handleOnOff(message.payload)
+
+        case 0x0104, 0x0337:
+            handleParameter(message.payload)
+
+        case 0x0138, 0x0338:
+            guard message.payload.count >= 2 else { return }
+            eventHandler?(.presetIndex(Int(message.payload[1])))
+            eventHandler?(.log("音箱切到预设 \(Int(message.payload[1]) + 1)"))
+
+        case 0x0363:
+            var reader = SparkPayloadReader(message.payload)
+            let bpm = reader.float(expected: 20...400)
+            eventHandler?(.log("Tap Tempo：\(Int(bpm)) BPM"))
+
+        default:
+            let hex = message.payload.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " ")
+            eventHandler?(.log("未处理消息 \(String(format: "%04X", message.cmdSub)) [\(hex)]"))
+        }
+    }
+
+    private func handleOnOff(_ payload: [UInt8]) {
+        var reader = SparkPayloadReader(payload)
+        let pedalName = reader.string()
+        let on = reader.byte() == 0xC3
+        guard let module = module(forPedalName: pedalName) else { return }
+        preset?.pedals = preset?.pedals ?? []
+        if let slot = module.slot, var pedals = preset?.pedals, slot < pedals.count {
+            pedals[slot].enabled = on
+            preset?.pedals = pedals
+        }
+        eventHandler?(.moduleChanged(module: module.id, enabled: on))
+    }
+
+    private func handleParameter(_ payload: [UInt8]) {
+        var reader = SparkPayloadReader(payload)
+        let pedalName = reader.string()
+        guard let paramIndex = reader.byte() else { return }
+        let value = reader.float(expected: 0...1)
+        guard let module = module(forPedalName: pedalName) else { return }
+        var display = Double(value) * 100
+        if let spec = module.params.first(where: { $0.mapping.param == Int(paramIndex) }) {
+            let ratio = Double(value)
+            display = spec.minValue + ratio * (spec.maxValue - spec.minValue)
+        }
+        if let slot = module.slot, var pedals = preset?.pedals, slot < pedals.count {
+            if Int(paramIndex) < pedals[slot].params.count {
+                pedals[slot].params[Int(paramIndex)] = value
+                preset?.pedals = pedals
+            }
+        }
+        eventHandler?(.paramChanged(module: module.id, param: Int(paramIndex), value: display))
+    }
+
+    private func apply(_ parsed: SparkPreset) {
+        preset = parsed
+        let index = parsed.presetNumber < 8 ? parsed.presetNumber : parsed.currentPreset
+        var modules: [ModuleState] = []
+
+        for spec in profile.modules {
+            guard let slot = spec.slot else {
+                // 全局模块（Spark 没有），保留默认值
+                var values: [Int: Double] = [:]
+                for p in spec.params { values[p.id] = p.initialValue }
+                modules.append(ModuleState(id: spec.id, enabled: spec.defaultEnabled, values: values))
+                continue
+            }
+            guard slot < parsed.pedals.count else { continue }
+            let pedal = parsed.pedals[slot]
+            var values: [Int: Double] = [:]
+            for p in spec.params {
+                guard let paramIndex = p.mapping.param, paramIndex < pedal.params.count else { continue }
+                let ratio = Double(pedal.params[paramIndex])
+                values[p.id] = p.minValue + ratio * (p.maxValue - p.minValue)
+            }
+            modules.append(ModuleState(id: spec.id, enabled: pedal.enabled, values: values))
+        }
+
+        let displayName = parsed.name.isEmpty ? "音色 \(index + 1)" : parsed.name
+        let snapshot = AmpSnapshot(presetIndex: index, name: displayName, modules: modules, updatedAt: Date())
+        eventHandler?(.stateLoaded(snapshot))
+        eventHandler?(.presetIndex(index))
+
+        for (i, pedal) in parsed.pedals.enumerated() {
+            eventHandler?(.log("槽位 \(i)：\(pedal.name) \(pedal.enabled ? "开" : "关")，参数 \(pedal.params.count) 个"))
+        }
+    }
+
+    // MARK: - 发送
+
+    func requestState() {
+        // 0x0201 + 0x0100 + 30 个 0 → 音箱回传当前音色
+        var payload: [UInt8] = [0x01, 0x00]
+        payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
+        send(cmd: 0x02, sub: 0x01, payload: payload)
+    }
+
+    func requestName() {
+        send(cmd: 0x02, sub: 0x11, payload: [])
+    }
+
+    func requestPresetNumber() {
+        send(cmd: 0x02, sub: 0x10, payload: [])
+    }
+
+    func requestSerial() {
+        send(cmd: 0x02, sub: 0x23, payload: [])
+    }
+
+    func requestFirmware() {
+        send(cmd: 0x02, sub: 0x2F, payload: [])
+    }
+
+    func selectPreset(_ index: Int) {
+        let current = preset?.currentPreset ?? 0
+        send(cmd: 0x01, sub: 0x38, payload: [UInt8(current & 0xFF), UInt8(index & 0xFF)])
+    }
+
+    func setModule(_ module: ModuleID, enabled: Bool) {
+        guard let spec = profile.module(module), let slot = spec.slot else { return }
+        guard let name = pedalName(slot: slot) else {
+            eventHandler?(.log("未知模块名，无法切换 \(module)"))
+            return
+        }
+        var payload = Self.prefixedString(name)
+        payload.append(enabled ? 0xC3 : 0xC2)
+        send(cmd: 0x01, sub: 0x15, payload: payload)
+    }
+
+    func setParameter(_ module: ModuleID, param: Int, value: Double) {
+        guard let spec = profile.parameter(module: module, param: param),
+              spec.mapping.kind == .sparkParam,
+              let pedalIndex = spec.mapping.slot,
+              let paramIndex = spec.mapping.param else { return }
+        guard let name = pedalName(slot: pedalIndex) else { return }
+        let span = spec.maxValue - spec.minValue
+        let ratio = span > 0 ? (value - spec.minValue) / span : 0
+        var payload = Self.prefixedString(name)
+        payload.append(UInt8(clamping: paramIndex))
+        payload.append(contentsOf: Self.floatBytes(Float(ratio)))
+        send(cmd: 0x01, sub: 0x04, payload: payload)
+    }
+
+    func tapTempo() {
+        send(cmd: 0x01, sub: 0x63, payload: [])
+    }
+
+    private func send(cmd: UInt8, sub: UInt8, payload: [UInt8]) {
+        sequence = sequence &+ 1
+        let frame = SparkProtocol.frame(cmd: cmd, sub: sub, payload: payload, sequence: sequence)
+        let chunkSize = profile.transport.chunkSize > 0 ? profile.transport.chunkSize : 20
+        let interval = Double(max(2, profile.transport.chunkIntervalMs)) / 1000.0
+        session?.sendChunked(Data(frame), chunkSize: chunkSize, interval: interval)
+        let hex = frame.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
+        eventHandler?(.log("→ \(String(format: "%02X%02X", cmd, sub)) \(hex)\(frame.count > 24 ? " …" : "")"))
+    }
+
+    // MARK: - 辅助
+
+    private func pedalName(slot: Int) -> String? {
+        if let preset, slot < preset.pedals.count {
+            let name = preset.pedals[slot].name
+            if !name.isEmpty { return name }
+        }
+        guard slot >= 0, slot < Self.fallbackPedalNames.count else { return nil }
+        return Self.fallbackPedalNames[slot]
+    }
+
+    private func module(forPedalName name: String) -> ModuleSpec? {
+        guard let preset else { return nil }
+        guard let slot = preset.pedals.firstIndex(where: { $0.name == name }) else { return nil }
+        return profile.moduleBySlot(slot)
+    }
+
+    static func prefixedString(_ string: String) -> [UInt8] {
+        let bytes = Array(string.utf8.prefix(31))
+        return [UInt8(bytes.count), UInt8(0xA0 + bytes.count)] + bytes
+    }
+
+    static func floatBytes(_ value: Float) -> [UInt8] {
+        let bits = value.bitPattern
+        return [0xCA,
+                UInt8((bits >> 24) & 0xFF),
+                UInt8((bits >> 16) & 0xFF),
+                UInt8((bits >> 8) & 0xFF),
+                UInt8(bits & 0xFF)]
+    }
+
+    /// 读不到预设时的兜底模块名（大多数 Spark 音色通用）。
+    static let fallbackPedalNames: [String] = [
+        "bias.noisegate",
+        "LA2AComp",
+        "Booster",
+        "Twin",
+        "Cloner",
+        "VintageDelay",
+        "bias.reverb"
+    ]
+}

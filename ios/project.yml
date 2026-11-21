@@ -1,0 +1,47 @@
+name: GuitarHub
+options:
+  bundleIdPrefix: com.guitarhub
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_STRICT_CONCURRENCY: minimal
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CLANG_ENABLE_MODULES: "YES"
+
+targets:
+  GuitarHub:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: GuitarHub
+        excludes:
+          - "Info.plist"
+          - "Resources"
+      - path: GuitarHub/Resources/Profiles
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.guitarhub.app
+        PRODUCT_NAME: GuitarHub
+        INFOPLIST_FILE: GuitarHub/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+
+schemes:
+  GuitarHub:
+    build:
+      targets:
+        GuitarHub: all
+    run:
+      config: Debug
+    archive:
+      config: Release

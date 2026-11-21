@@ -1,0 +1,18 @@
+# macOS / Xcode
+.DS_Store
+ios/build/
+ios/*.xcodeproj
+ios/*.xcworkspace
+DerivedData/
+
+# Python
+__pycache__/
+*.pyc
+research/pylibs/
+research/tmp/
+research/t2/
+
+# 参考资料体积较大，保留在本地即可，不必上传
+research/pdf/
+research/src/
+research/*.txt

@@ -1,0 +1,180 @@
+import Foundation
+import CoreBluetooth
+import Combine
+
+/// 全局装配：设备、MIDI、KORG、踏板路由。
+///
+/// 入口模型：启动后先选「键盘模式」或「电吉他模式」，两者互斥。
+/// 电吉他模式里再选一台设备（Spark / Pulze / 以后新增的），同一时刻只连这一台。
+final class DeviceHub: ObservableObject {
+
+    let store: AppStore
+    let profiles: ProfileStore
+    let midi: MIDIService
+    let korg: KorgController
+    let pedal: PedalRouter
+    let pedalInput: BLEMIDIPedal
+
+    @Published private(set) var devices: [AmpDevice] = []
+    @Published private(set) var mode: AppMode = .launch
+    @Published private(set) var selectedDeviceID: DeviceProfileID?
+
+    init() {
+        let store = AppStore()
+        let profiles = ProfileStore()
+        let midi = MIDIService()
+        let korg = KorgController(midi: midi, store: store)
+        let pedal = PedalRouter(store: store, korg: korg)
+        let pedalInput = BLEMIDIPedal()
+
+        self.store = store
+        self.profiles = profiles
+        self.midi = midi
+        self.korg = korg
+        self.pedal = pedal
+        self.pedalInput = pedalInput
+        self.selectedDeviceID = UserDefaults.standard.string(forKey: "selected.device")
+            ?? profiles.profiles.first?.id
+
+        buildDevices()
+        ensureBanks()
+        pedal.attach(devices: devices)
+        pedal.onFeedback = { [weak self] text in self?.pedal.lastEvent = text }
+
+        midi.onMessage = { [weak self] message, source in
+            self?.pedal.handle(message, source: source)
+        }
+        pedalInput.onMessage = { [weak self] message in
+            self?.pedal.handle(message, source: "蓝牙踏板")
+        }
+        pedalInput.onLog = { [weak self] text in self?.pedalInputLog(text) }
+    }
+
+    // MARK: - 入口
+
+    var selectedDevice: AmpDevice? {
+        selectedDeviceID.flatMap(device(id:))
+    }
+
+    var guitarDevices: [AmpDevice] { devices }
+
+    func enterGuitar(_ id: DeviceProfileID) {
+        selectedDeviceID = id
+        UserDefaults.standard.set(id, forKey: "selected.device")
+        mode = .guitar
+        applySelection(connect: true)
+    }
+
+    func enterKeyboard() {
+        mode = .keyboard
+        applySelection(connect: false)
+    }
+
+    func backToLaunch() {
+        mode = .launch
+        applySelection(connect: false)
+    }
+
+    /// 只切换选中的设备，不主动连接（用于设备页里手动搜索/连接）。
+    func selectForConnection(_ device: AmpDevice) {
+        selectedDeviceID = device.profile.id
+        UserDefaults.standard.set(device.profile.id, forKey: "selected.device")
+        mode = .guitar
+        applySelection(connect: false)
+    }
+
+    func connect(_ device: AmpDevice, to id: UUID) {
+        selectForConnection(device)
+        device.connect(to: id)
+    }
+
+    private func applySelection(connect: Bool) {
+        let activeID = mode == .guitar ? selectedDeviceID : nil
+        pedal.setActive(deviceID: activeID, keyboard: mode == .keyboard)
+
+        for device in devices where device.profile.id != activeID {
+            if device.status.isConnected || device.status.isBusy {
+                device.disconnect()
+            }
+        }
+
+        let bankName: String
+        switch mode {
+        case .keyboard: bankName = BankNames.keyboard
+        case .guitar:   bankName = selectedDevice?.profile.name ?? ""
+        case .launch:   bankName = ""
+        }
+        if !bankName.isEmpty,
+           let bank = store.data.pedalBanks.first(where: { $0.name == bankName }) {
+            store.data.activeBankID = bank.id
+        }
+
+        guard connect, let device = selectedDevice else { return }
+        if !device.status.isConnected, !device.status.isBusy {
+            device.connectLast()
+        }
+    }
+
+    // MARK: - 设备
+
+    private func buildDevices() {
+        devices = profiles.profiles.map { makeDevice(profile: $0) }
+    }
+
+    /// 给每个设备配置准备一套同名踏板组；新增设备后自动出现。
+    private func ensureBanks() {
+        var banks = store.data.pedalBanks
+        for profile in profiles.profiles where !banks.contains(where: { $0.name == profile.name }) {
+            banks.append(PedalBank.ampStarter(device: profile.id, name: profile.name))
+        }
+        if !banks.contains(where: { $0.name == BankNames.keyboard }) {
+            banks.append(PedalBank.korgStarter())
+        }
+        if banks.map(\.id) != store.data.pedalBanks.map(\.id) {
+            store.data.pedalBanks = banks
+        }
+    }
+
+    private func makeDevice(profile: DeviceProfile) -> AmpDevice {
+        let session = BLESession()
+        let transport = profile.transport
+
+        let prefixes = transport.namePrefixes
+        session.nameFilter = { name in
+            guard !prefixes.isEmpty else { return true }
+            return prefixes.contains { name.localizedCaseInsensitiveContains($0) }
+        }
+        if !transport.serviceUUIDs.isEmpty {
+            session.serviceFilter = transport.serviceUUIDs.map { CBUUID(string: $0) }
+        }
+
+        let codec: DeviceCodec
+        switch transport.codec {
+        case .spark:
+            codec = SparkCodec(profile: profile, session: session)
+        case .midiCC:
+            codec = MIDICodec(profile: profile, session: session)
+        case .template:
+            // 模板编解码器尚未实现；先用 MIDI 编码器占位，避免静默失败。
+            codec = MIDICodec(profile: profile, session: session)
+        }
+
+        return AmpDevice(profile: profile, session: session, codec: codec, store: store)
+    }
+
+    func device(id: DeviceProfileID) -> AmpDevice? {
+        devices.first { $0.profile.id == id }
+    }
+
+    func reloadProfiles() {
+        profiles.reload()
+        buildDevices()
+        ensureBanks()
+        pedal.attach(devices: devices)
+        applySelection(connect: false)
+    }
+
+    private func pedalInputLog(_ text: String) {
+        pedal.log(text)
+    }
+}
