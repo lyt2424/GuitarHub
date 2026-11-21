@@ -15,6 +15,7 @@ final class PedalRouter: ObservableObject {
     private var devices: [DeviceProfileID: AmpDevice] = [:]
     private var activeDeviceID: DeviceProfileID?
     private var keyboardMode = false
+    weak var moduleHost: ModuleAUHost?
     private var drumPlaying: [DeviceProfileID: Bool] = [:]
 
     init(store: AppStore, korg: KorgController) {
@@ -112,11 +113,19 @@ final class PedalRouter: ObservableObject {
 
         case .korgProgram(let program):
             guard keyboardMode else { return skip("KORG") }
-            korg.select(program: program)
+            if let host = moduleHost, host.isReady {
+                host.select(program)
+            } else {
+                korg.select(program: program)
+            }
 
         case .korgStep(let delta):
             guard keyboardMode else { return skip("KORG") }
-            korg.step(delta)
+            if let host = moduleHost, host.isReady {
+                host.step(delta)
+            } else {
+                korg.step(delta)
+            }
 
         case .korgSetlistNext:
             guard keyboardMode else { return skip("KORG") }

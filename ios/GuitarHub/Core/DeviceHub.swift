@@ -15,6 +15,7 @@ final class DeviceHub: ObservableObject {
     let pedal: PedalRouter
     let pedalInput: BLEMIDIPedal
     let bleMIDI: BLEMIDIPeripheral
+    let moduleHost = ModuleAUHost()
 
     @Published private(set) var devices: [AmpDevice] = []
     @Published private(set) var mode: AppMode = .launch
@@ -39,6 +40,7 @@ final class DeviceHub: ObservableObject {
         korg.blePeripheral = bleMIDI
         self.selectedDeviceID = UserDefaults.standard.string(forKey: "selected.device")
             ?? profiles.profiles.first?.id
+        pedal.moduleHost = moduleHost
 
         buildDevices()
         ensureBanks()

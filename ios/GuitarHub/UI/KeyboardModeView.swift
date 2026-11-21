@@ -7,7 +7,7 @@ struct KeyboardModeView: View {
 
     var body: some View {
         NavigationStack {
-            KorgScreen(korg: hub.korg, store: hub.store, midi: hub.midi, ble: hub.bleMIDI)
+            ModuleHostView(host: hub.moduleHost)
                 .background(Theme.background)
                 .navigationTitle("键盘模式")
                 .navigationBarTitleDisplayMode(.inline)
