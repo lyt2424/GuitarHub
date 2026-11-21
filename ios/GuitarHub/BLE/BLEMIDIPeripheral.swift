@@ -77,10 +77,10 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
         if !serviceAdded {
             let char = CBMutableCharacteristic(
                 type: BLEMIDI.characteristicUUID,
-                // 同时提供 notify 和 indicate：不同 App 的 BLE MIDI 实现订阅方式不同。
-                properties: [.notify, .indicate, .write, .writeWithoutResponse, .read],
+                // 标准 BLE MIDI 外设的形态：notify + writeWithoutResponse。
+                properties: [.notify, .writeWithoutResponse],
                 value: nil,
-                permissions: [.readable, .writeable]
+                permissions: [.writeable]
             )
             let svc = CBMutableService(type: BLEMIDI.serviceUUID, primary: true)
             svc.characteristics = [char]
@@ -144,10 +144,20 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
         if let error {
             statusText = "添加服务失败：\(error.localizedDescription)"
-            onLog?(statusText)
+            logEvent("添加服务失败：\(error.localizedDescription)")
             return
         }
+        logEvent("MIDI 服务已添加")
         if wantAdvertising { publish() }
+    }
+
+    func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+        if let error {
+            statusText = "广播失败：\(error.localizedDescription)"
+            logEvent("广播失败：\(error.localizedDescription)")
+        } else {
+            logEvent("开始广播 StageControl MIDI")
+        }
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
@@ -168,14 +178,6 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
 
     func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
         // 发送队列恢复，无需处理
-    }
-
-    func peripheralManager(_ peripheral: CBPeripheralManager,
-                           didReceiveRead request: CBATTRequest) {
-        // 返回一个合法的空 MIDI 包，满足先读后订阅的实现。
-        request.value = Data([0x80, 0x00])
-        peripheral.respond(to: request, withResult: .success)
-        logEvent("对方读取特征")
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
