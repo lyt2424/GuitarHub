@@ -155,7 +155,9 @@ private struct PedalConnectionCard: View {
 
 enum ActionKind: String, CaseIterable, Identifiable, Hashable {
     case none, ampModule, ampPresetStep, ampPreset, ampTapTempo, ampParamFollow
-    case korgProgram, korgStep, korgSetlistNext, bankStep
+    case korgProgram, korgStep, korgSetlistNext
+    case drumToggle, drumStep
+    case bankStep
 
     var id: String { rawValue }
     var label: String {
@@ -169,6 +171,8 @@ enum ActionKind: String, CaseIterable, Identifiable, Hashable {
         case .korgProgram:     return "Module 指定音色"
         case .korgStep:        return "Module 上/下一个音色"
         case .korgSetlistNext: return "Module 下一音色表"
+        case .drumToggle:      return "鼓机 播放/停止"
+        case .drumStep:        return "鼓机 上一个/下一个"
         case .bankStep:        return "切换踏板组"
         }
     }
@@ -268,7 +272,8 @@ struct MappingEditor: View {
                     if actionKind == .ampPreset || actionKind == .korgProgram {
                         Stepper("目标编号 \(index)", value: $index, in: 0...127)
                     }
-                    if actionKind == .ampPresetStep || actionKind == .korgStep || actionKind == .bankStep {
+                    if actionKind == .ampPresetStep || actionKind == .korgStep
+                        || actionKind == .drumStep || actionKind == .bankStep {
                         Stepper("步进 \(delta > 0 ? "+1" : "-1")", value: $delta, in: -1...1)
                     }
                 }
@@ -317,6 +322,8 @@ struct MappingEditor: View {
         case .korgProgram: action = .korgProgram(program: index)
         case .korgStep: action = .korgStep(delta: delta >= 0 ? 1 : -1)
         case .korgSetlistNext: action = .korgSetlistNext
+        case .drumToggle: action = .drumToggle(device: deviceID)
+        case .drumStep: action = .drumStep(device: deviceID, delta: delta >= 0 ? 1 : -1)
         case .bankStep: action = .bankStep(delta: delta >= 0 ? 1 : -1)
         }
         return PedalMapping(id: original?.id ?? UUID(), trigger: trigger, action: action)
@@ -348,6 +355,8 @@ struct MappingEditor: View {
         case .korgProgram: return .korgProgram
         case .korgStep: return .korgStep
         case .korgSetlistNext: return .korgSetlistNext
+        case .drumToggle: return .drumToggle
+        case .drumStep: return .drumStep
         case .bankStep: return .bankStep
         }
     }

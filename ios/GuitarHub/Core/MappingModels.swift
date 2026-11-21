@@ -70,6 +70,11 @@ enum PedalAction: Codable, Hashable {
     case korgStep(delta: Int)
     case korgSetlistNext
 
+    /// 鼓机播放 / 停止（设备不回报状态，App 自己记）。
+    case drumToggle(device: DeviceProfileID)
+    /// 鼓机上一个 / 下一个节奏。
+    case drumStep(device: DeviceProfileID, delta: Int)
+
     case bankStep(delta: Int)
 
     var label: String {
@@ -92,6 +97,10 @@ enum PedalAction: Codable, Hashable {
             return "Module · \(delta > 0 ? "下一音色" : "上一音色")"
         case .korgSetlistNext:
             return "Module · 下一音色表"
+        case .drumToggle(let d):
+            return "\(d) · 鼓机播放/停止"
+        case .drumStep(let d, let delta):
+            return "\(d) · 鼓机\(delta > 0 ? "下一个" : "上一个")"
         case .bankStep(let delta):
             return "踏板 · \(delta > 0 ? "下一组" : "上一组")"
         }
@@ -125,11 +134,14 @@ struct PedalBank: Codable, Identifiable, Hashable {
         PedalBank(
             name: "Pulze Mini",
             mappings: [
-                PedalMapping(trigger: .cc(number: 20), action: .ampModule(device: "pulze-mini", module: "dyn")),
-                PedalMapping(trigger: .cc(number: 21), action: .ampModule(device: "pulze-mini", module: "fx1")),
-                PedalMapping(trigger: .cc(number: 22), action: .ampModule(device: "pulze-mini", module: "fx2")),
-                PedalMapping(trigger: .cc(number: 23), action: .ampPresetStep(device: "pulze-mini", delta: 1)),
-                PedalMapping(trigger: .cc(number: 24), action: .ampPresetStep(device: "pulze-mini", delta: -1))
+                // 第 1 页：A 上一个音色 / B 下一个音色 / C 空 / D FX2 开关
+                PedalMapping(trigger: .cc(number: 20), action: .ampPresetStep(device: "pulze-mini", delta: -1)),
+                PedalMapping(trigger: .cc(number: 21), action: .ampPresetStep(device: "pulze-mini", delta: 1)),
+                PedalMapping(trigger: .cc(number: 23), action: .ampModule(device: "pulze-mini", module: "fx2")),
+                // 第 2 页：A 鼓机播放/停止 / B 上一个鼓机 / C 下一个鼓机
+                PedalMapping(trigger: .cc(number: 24), action: .drumToggle(device: "pulze-mini")),
+                PedalMapping(trigger: .cc(number: 25), action: .drumStep(device: "pulze-mini", delta: -1)),
+                PedalMapping(trigger: .cc(number: 26), action: .drumStep(device: "pulze-mini", delta: 1))
             ]
         )
     }

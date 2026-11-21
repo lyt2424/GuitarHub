@@ -15,6 +15,7 @@ final class PedalRouter: ObservableObject {
     private var devices: [DeviceProfileID: AmpDevice] = [:]
     private var activeDeviceID: DeviceProfileID?
     private var keyboardMode = false
+    private var drumPlaying: [DeviceProfileID: Bool] = [:]
 
     init(store: AppStore, korg: KorgController) {
         self.store = store
@@ -108,6 +109,23 @@ final class PedalRouter: ObservableObject {
         case .korgSetlistNext:
             guard keyboardMode else { return skip("KORG") }
             korg.nextSetlist()
+
+        case .drumToggle(let device):
+            guard isActive(device) else { return skip(device) }
+            guard let amp = devices[device] else { return }
+            let playing = drumPlaying[device] ?? false
+            amp.sendCC(61, playing ? 0 : 127)
+            drumPlaying[device] = !playing
+            log("鼓机 \(playing ? "停止" : "播放")")
+
+        case .drumStep(let device, let delta):
+            guard isActive(device) else { return skip(device) }
+            guard let amp = devices[device] else { return }
+            let current = Int(amp.value("drum", 1))
+            var next = current + delta
+            if next < 0 { next = 99 }
+            if next > 99 { next = 0 }
+            amp.setParameter("drum", param: 1, value: Double(next))
 
         case .bankStep(let delta):
             cycleBank(delta)
