@@ -136,10 +136,10 @@ final class AmpDevice: ObservableObject, Identifiable {
 
         codec.selectPreset(index)
         if let snap = store.snapshot(profile.id, index: index) {
-            presetName = snap.name
+            presetName = store.alias(profile.id, index: index) ?? snap.name
             modules = Self.merge(snapshot: snap.modules, profile: profile)
         } else {
-            presetName = "音色 \(index + 1)"
+            presetName = store.alias(profile.id, index: index) ?? "音色 \(index + 1)"
             modules = profile.defaultModules
         }
         if store.data.settings.pushFullStateOnRecall {

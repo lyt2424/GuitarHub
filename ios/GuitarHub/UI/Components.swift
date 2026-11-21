@@ -132,9 +132,6 @@ struct ModuleBlock: View {
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Text(enabled ? "ON" : "OFF")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .opacity(enabled ? 0.85 : 0.5)
             }
             .foregroundStyle(enabled ? Color.white : Color.white.opacity(0.32))
             .frame(maxWidth: .infinity)

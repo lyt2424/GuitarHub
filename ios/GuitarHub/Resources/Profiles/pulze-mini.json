@@ -23,19 +23,21 @@
   },
   "presets": {
     "startNumber": 0,
-    "wrap": true
+    "wrap": true,
+    "stepCCNext": 27,
+    "stepCCPrev": 26
   },
   "modules": [
     {
-      "id": "nr",
-      "name": "降噪",
+      "id": "dyn",
+      "name": "动态",
       "bypass": {
         "kind": "cc",
         "cc": 45,
         "onValue": 127,
         "offValue": 0
       },
-      "shortName": "NR",
+      "shortName": "DYN",
       "colorHex": "#84CC16"
     },
     {
@@ -52,7 +54,7 @@
     },
     {
       "id": "amp",
-      "name": "音箱",
+      "name": "箱头",
       "bypass": {
         "kind": "cc",
         "cc": 47,

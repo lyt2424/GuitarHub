@@ -63,8 +63,22 @@ final class MIDICodec: DeviceCodec {
     // MARK: - 控制
 
     func selectPreset(_ index: Int) {
-        lastProgram = index
-        sendProgramChange(index)
+        let clamped = index.clamped(to: 0...127)
+        // 优先用设备手册里明确支持的 CC 上/下一个；没有配置才退回 Program Change。
+        if let next = profile.presets.stepCCNext, let prev = profile.presets.stepCCPrev {
+            var delta = clamped - lastProgram
+            if delta > 64 { delta -= 128 }
+            if delta < -64 { delta += 128 }
+            let cc = delta >= 0 ? next : prev
+            for _ in 0..<abs(delta) {
+                sendCC(cc, 127)
+            }
+            lastProgram = clamped
+            eventHandler?(.log("→ 换音色：CC \(cc) × \(abs(delta))，目标 #\(clamped + 1)"))
+        } else {
+            lastProgram = clamped
+            sendProgramChange(clamped)
+        }
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {

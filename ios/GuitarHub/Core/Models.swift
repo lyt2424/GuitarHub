@@ -127,8 +127,11 @@ struct DeviceProfile: Identifiable, Codable, Hashable {
     struct PresetConfig: Codable, Hashable {
         var startNumber: Int = 0
         var wrap: Bool = true
+        /// 有些设备不支持 PC 换音色，只认 CC“上一个/下一个”。
+        var stepCCNext: Int? = nil
+        var stepCCPrev: Int? = nil
 
-        enum CodingKeys: String, CodingKey { case startNumber, wrap }
+        enum CodingKeys: String, CodingKey { case startNumber, wrap, stepCCNext, stepCCPrev }
 
         init() {}
 
@@ -136,6 +139,8 @@ struct DeviceProfile: Identifiable, Codable, Hashable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             startNumber = c.value(.startNumber, default: 0)
             wrap = c.value(.wrap, default: true)
+            stepCCNext = c.optional(.stepCCNext)
+            stepCCPrev = c.optional(.stepCCPrev)
         }
     }
 

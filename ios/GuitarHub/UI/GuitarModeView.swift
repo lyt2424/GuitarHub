@@ -62,6 +62,7 @@ struct GuitarModeView: View {
 /// 单独一层，用 @ObservedObject 订阅设备，这样 presetName / modules 变化时界面会实时刷新。
 private struct GuitarDeviceView: View {
     @ObservedObject var device: AmpDevice
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var selectedModule: ModuleID?
     @State private var showPresets = false
@@ -230,7 +231,9 @@ private struct GuitarDeviceView: View {
 
     private var moduleGrid: some View {
         let modules = device.modules.filter { !(device.profile.module($0.id)?.isGlobal ?? false) }
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+        // 横屏（verticalSizeClass == .compact）多放一列，演出时一屏看全。
+        let columnCount = verticalSizeClass == .compact ? 4 : 3
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: columnCount), spacing: 10) {
             ForEach(modules) { state in
                 if let spec = device.profile.module(state.id) {
                     ModuleBlock(
