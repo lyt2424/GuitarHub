@@ -90,17 +90,35 @@ final class KorgController: ObservableObject {
         }
     }
 
-    private func sendPC(_ program: Int) {
-        let base = store.data.settings.korgPCBase ?? 0
-        let value = (program + base).clamped(to: 0...127)
-        let message = MIDIMessage.programChange(channel: channel, program: value)
+    private func sendMessage(_ message: MIDIMessage, description: String) {
         let useBLE = (store.data.settings.korgBLEOutput ?? false) && (blePeripheral?.hasSubscribers ?? false)
         if useBLE {
             blePeripheral?.send(message.bytes)
         } else {
-            midi.send([message], description: "PC ch\(channel) #\(value)")
+            midi.send([message], description: description)
         }
-        lastSendDescription = useBLE ? "PC ch\(channel) #\(value)（BLE）" : "PC ch\(channel) #\(value)"
+        lastSendDescription = useBLE ? "\(description)（BLE）" : description
+    }
+
+    private func sendPC(_ program: Int) {
+        let base = store.data.settings.korgPCBase ?? 0
+        let value = (program + base).clamped(to: 0...127)
+        sendMessage(MIDIMessage.programChange(channel: channel, program: value),
+                    description: "PC ch\(channel) #\(value)")
+    }
+
+    /// 用标准 RPN 2（Master Coarse Tuning）移调，单位半音，中心 64。
+    func sendTranspose(_ semitones: Int) {
+        let ch = channel
+        let value = (64 + semitones).clamped(to: 0...127)
+        let steps: [(Int, Int)] = [(101, 0), (100, 2), (6, value), (38, 0)]
+        for (index, step) in steps.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.02) { [weak self] in
+                guard let self else { return }
+                self.sendMessage(MIDIMessage.controlChange(channel: ch, number: step.0, value: step.1),
+                                 description: "RPN2 ch\(ch) \(semitones > 0 ? "+" : "")\(semitones)")
+            }
+        }
     }
 
     /// 依次在 1–16 通道发 PC 0，用来找出 Module 实际监听的通道。

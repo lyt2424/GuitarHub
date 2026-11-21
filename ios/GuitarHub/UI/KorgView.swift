@@ -35,6 +35,7 @@ struct KorgScreen: View {
     }
 
     private var bleEnabled: Bool { store.data.settings.korgBLEOutput ?? false }
+    private var transposeSendsMIDI: Bool { (store.data.settings.transposeMode ?? "display") == "rpn" }
 
     var body: some View {
         ScrollView {
@@ -150,6 +151,9 @@ struct KorgScreen: View {
     private func changeTranspose(_ delta: Int) {
         let next = ((store.data.settings.korgTranspose ?? 0) + delta).clamped(to: -11...11)
         store.data.settings.korgTranspose = next
+        if transposeSendsMIDI {
+            korg.sendTranspose(next)
+        }
     }
 
     // MARK: - 输出
@@ -229,6 +233,20 @@ struct KorgScreen: View {
                     Text(korg.lastSendDescription)
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("转调发送").font(.caption)
+                    Spacer()
+                    Picker("转调发送", selection: Binding(
+                        get: { store.data.settings.transposeMode ?? "display" },
+                        set: { store.data.settings.transposeMode = $0 }
+                    )) {
+                        Text("仅显示").tag("display")
+                        Text("RPN 2").tag("rpn")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 170)
                 }
             }
         }

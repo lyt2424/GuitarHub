@@ -14,6 +14,8 @@ final class AppStore: ObservableObject {
         var korgBLEOutput: Bool? = nil
         /// 转调（半音，-11…+11）。
         var korgTranspose: Int? = nil
+        /// 转调发送方式："display" 只显示；"rpn" 发 RPN 2（Master Coarse Tuning）。
+        var transposeMode: String? = nil
         var hapticsEnabled: Bool = true
         /// 召回音色时是否把本地保存的模块状态整包推给设备。
         var pushFullStateOnRecall: Bool = true
