@@ -42,6 +42,16 @@ final class AmpDevice: ObservableObject, Identifiable {
         if let snap = store.snapshot(profile.id, index: lastIndex) {
             self.modules = Self.merge(snapshot: snap.modules, profile: profile)
         }
+        // 恢复上次的全局参数（音量等）。
+        for i in self.modules.indices {
+            guard let spec = profile.module(self.modules[i].id), spec.isGlobal else { continue }
+            for p in spec.params {
+                let key = Self.globalKey(profile.id, spec.id, p.id)
+                if let saved = UserDefaults.standard.object(forKey: key) as? Double {
+                    self.modules[i].values[p.id] = p.clamp(saved)
+                }
+            }
+        }
 
         session.$status
             .receive(on: RunLoop.main)
@@ -138,6 +148,10 @@ final class AmpDevice: ObservableObject, Identifiable {
         }
 
         codec.selectPreset(index)
+
+        // 全局模块（音量等）不属于任何预设：切音色前后保持原值，也不参与整包下发。
+        let globals = modules.filter { profile.module($0.id)?.isGlobal ?? false }
+
         if let snap = store.snapshot(profile.id, index: index) {
             presetName = store.alias(profile.id, index: index) ?? snap.name
             modules = Self.merge(snapshot: snap.modules, profile: profile)
@@ -145,6 +159,12 @@ final class AmpDevice: ObservableObject, Identifiable {
             presetName = store.alias(profile.id, index: index) ?? "音色 \(index + 1)"
             modules = profile.defaultModules
         }
+        for saved in globals {
+            if let i = modules.firstIndex(where: { $0.id == saved.id }) {
+                modules[i] = saved
+            }
+        }
+
         if store.data.settings.pushFullStateOnRecall {
             pushAll()
         }
@@ -217,7 +237,15 @@ final class AmpDevice: ObservableObject, Identifiable {
         let clamped = spec.clamp(value)
         modules[index].values[param] = clamped
         codec.setParameter(module, param: param, value: clamped)
+        if profile.module(module)?.isGlobal ?? false {
+            // 全局参数记在本机，重启 App 后保持。
+            UserDefaults.standard.set(clamped, forKey: Self.globalKey(profile.id, module, param))
+        }
         capture()
+    }
+
+    private static func globalKey(_ profileID: DeviceProfileID, _ module: ModuleID, _ param: Int) -> String {
+        "global.\(profileID).\(module).\(param)"
     }
 
     /// 界面上实际要显示的参数：只显示设备报告过 / 配置里定义过的。
@@ -249,6 +277,7 @@ final class AmpDevice: ObservableObject, Identifiable {
     func pushAll() {
         guard status.isConnected else { return }
         for module in modules {
+            if profile.module(module.id)?.isGlobal ?? false { continue }
             if let moduleSpec = profile.module(module.id), moduleSpec.bypass.kind != .none {
                 codec.setModule(module.id, enabled: module.enabled)
             }
@@ -296,7 +325,9 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     private func capture() {
         guard store.data.settings.autoCapture, status.isConnected else { return }
-        store.save(modules: modules, name: presetName, index: presetIndex, for: profile.id)
+        // 全局模块不写进预设库，避免下次切回来时把音量改掉。
+        let stored = modules.filter { !(profile.module($0.id)?.isGlobal ?? false) }
+        store.save(modules: stored, name: presetName, index: presetIndex, for: profile.id)
     }
 
     private func log(_ message: String) {

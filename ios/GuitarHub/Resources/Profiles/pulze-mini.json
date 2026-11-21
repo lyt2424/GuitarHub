@@ -132,28 +132,6 @@
             "kind": "cc",
             "cc": 7
           }
-        },
-        {
-          "id": 1,
-          "name": "蓝牙音量",
-          "minValue": 0,
-          "maxValue": 100,
-          "defaultValue": 50,
-          "mapping": {
-            "kind": "cc",
-            "cc": 9
-          }
-        },
-        {
-          "id": 2,
-          "name": "乐器音量",
-          "minValue": 0,
-          "maxValue": 100,
-          "defaultValue": 50,
-          "mapping": {
-            "kind": "cc",
-            "cc": 8
-          }
         }
       ],
       "shortName": "VOL",
