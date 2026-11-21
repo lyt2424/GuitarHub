@@ -37,7 +37,9 @@ enum BLEMIDI {
     /// 把纯 MIDI 字节封装成一个 BLE MIDI 包（时间戳取当前毫秒的低 13 位）。
     static func encode(_ midi: [UInt8]) -> Data {
         guard !midi.isEmpty else { return Data() }
-        let timestamp = UInt16(Date().timeIntervalSince1970 * 1000) & 0x1FFF
+        // 注意：毫秒时间戳约 1.8e12，必须先取模再转 UInt16，否则运行时直接崩。
+        let millis = UInt64(Date().timeIntervalSince1970 * 1000)
+        let timestamp = UInt16(millis & 0x1FFF)
         var out: [UInt8] = [
             0x80 | UInt8((timestamp >> 7) & 0x3F),
             0x80 | UInt8(timestamp & 0x7F)

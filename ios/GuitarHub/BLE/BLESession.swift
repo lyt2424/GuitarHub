@@ -36,6 +36,8 @@ final class BLESession: NSObject, ObservableObject {
     private var scanTimeout: DispatchWorkItem?
     private var autoReconnect = true
     private var pendingScan = false
+    private var fallbackItem: DispatchWorkItem?
+    private var didFallbackScan = false
     private var expectedServiceCount = 0
     private var discoveredServiceCount = 0
     private var didFinishDiscovery = false
@@ -68,9 +70,10 @@ final class BLESession: NSObject, ObservableObject {
         notifyChars.removeAll()
         isScanning = true
         status = .scanning
-        central.scanForPeripherals(withServices: serviceFilter,
-                                   options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        didFallbackScan = false
+        beginScan(useFilter: true)
         log("开始扫描…")
+        scheduleFallbackScan()
         scanTimeout?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self, self.isScanning else { return }
@@ -78,13 +81,35 @@ final class BLESession: NSObject, ObservableObject {
             self.log("扫描超时，已停止。请确认设备已开机并处于可连接状态。")
         }
         scanTimeout = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: item)
+    }
+
+    private func beginScan(useFilter: Bool) {
+        let services = useFilter ? serviceFilter : nil
+        central?.scanForPeripherals(withServices: services,
+                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+    }
+
+    /// 有些 BLE MIDI 设备不在广播里带服务 UUID，按服务扫会一台都看不到。
+    /// 6 秒没结果就自动改成全量扫描（仍按名字过滤）。
+    private func scheduleFallbackScan() {
+        fallbackItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.isScanning, !self.didFallbackScan, self.discovered.isEmpty else { return }
+            self.didFallbackScan = true
+            self.central?.stopScan()
+            self.beginScan(useFilter: false)
+            self.log("按服务没找到设备，已改为全量扫描…")
+        }
+        fallbackItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: item)
     }
 
     func stopScan() {
         central?.stopScan()
         isScanning = false
         scanTimeout?.cancel()
+        fallbackItem?.cancel()
         if status == .scanning { status = .disconnected }
     }
 
