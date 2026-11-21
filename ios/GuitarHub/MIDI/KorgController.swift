@@ -17,6 +17,7 @@ final class KorgController: ObservableObject {
     @Published private(set) var lastSendDescription = "—"
 
     let midi: MIDIService
+    weak var blePeripheral: BLEMIDIPeripheral?
     private let store: AppStore
 
     init(midi: MIDIService, store: AppStore) {
@@ -93,8 +94,13 @@ final class KorgController: ObservableObject {
         let base = store.data.settings.korgPCBase ?? 0
         let value = (program + base).clamped(to: 0...127)
         let message = MIDIMessage.programChange(channel: channel, program: value)
-        let description = "PC ch\(channel) #\(value)"
-        midi.send([message], description: description)
+        let useBLE = (store.data.settings.korgBLEOutput ?? false) && (blePeripheral?.hasSubscribers ?? false)
+        if useBLE {
+            blePeripheral?.send(message.bytes)
+        } else {
+            midi.send([message], description: "PC ch\(channel) #\(value)")
+        }
+        let description = useBLE ? "PC #\(value)（BLE）" : "PC ch\(channel) #\(value)"
         lastSendDescription = description
     }
 }

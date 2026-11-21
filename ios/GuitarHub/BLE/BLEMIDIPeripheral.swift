@@ -1,0 +1,142 @@
+import Foundation
+import CoreBluetooth
+import Combine
+
+/// 让 iPhone 变成一台 BLE MIDI 设备，iPad 上的 KORG Module 可以直接在
+/// “Bluetooth MIDI”里搜到并连接。用于方案二。
+final class BLEMIDIPeripheral: NSObject, ObservableObject {
+
+    @Published private(set) var isAdvertising = false
+    @Published private(set) var subscriberCount = 0
+    @Published private(set) var bluetoothState: CBManagerState = .unknown
+    @Published private(set) var statusText = "未开启"
+
+    var onLog: ((String) -> Void)?
+
+    private var manager: CBPeripheralManager?
+    private var characteristic: CBMutableCharacteristic?
+    private var serviceAdded = false
+    private var wantAdvertising = false
+
+    var hasSubscribers: Bool { subscriberCount > 0 }
+
+    func start() {
+        wantAdvertising = true
+        if manager == nil {
+            manager = CBPeripheralManager(delegate: self, queue: .main, options: nil)
+        }
+        switch manager?.state {
+        case .poweredOn:
+            publish()
+        case .unauthorized:
+            statusText = "蓝牙未授权"
+        case .poweredOff:
+            statusText = "蓝牙已关闭"
+        case .unsupported:
+            statusText = "不支持蓝牙外设模式"
+        default:
+            statusText = "正在初始化…"
+        }
+    }
+
+    func stop() {
+        wantAdvertising = false
+        manager?.stopAdvertising()
+        isAdvertising = false
+        subscriberCount = 0
+        statusText = "已停止"
+    }
+
+    private func publish() {
+        guard let manager else { return }
+        if !serviceAdded {
+            let char = CBMutableCharacteristic(
+                type: BLEMIDI.characteristicUUID,
+                properties: [.notify, .write, .writeWithoutResponse, .read],
+                value: nil,
+                permissions: [.readable, .writeable]
+            )
+            let svc = CBMutableService(type: BLEMIDI.serviceUUID, primary: true)
+            svc.characteristics = [char]
+            characteristic = char
+            manager.add(svc)
+            serviceAdded = true
+            return   // 等 didAdd 回调再开始广播
+        }
+        manager.startAdvertising([
+            CBAdvertisementDataServiceUUIDsKey: [BLEMIDI.serviceUUID],
+            CBAdvertisementDataLocalNameKey: "舞台Control MIDI"
+        ])
+        isAdvertising = true
+        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：舞台Control MIDI"
+        onLog?("BLE MIDI 外设广播已开启")
+    }
+
+    /// 发送纯 MIDI 字节（内部封装成 BLE MIDI 包）。
+    func send(_ midi: [UInt8]) {
+        guard let manager, let char = characteristic, !midi.isEmpty else { return }
+        let data = BLEMIDI.encode(midi)
+        let ok = manager.updateValue(data, for: char, onSubscribedCentrals: nil)
+        if !ok {
+            // 发送队列满：稍后重试一次
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in
+                guard let self, let manager = self.manager, let char = self.characteristic else { return }
+                _ = manager.updateValue(data, for: char, onSubscribedCentrals: nil)
+            }
+        }
+    }
+}
+
+extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
+
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        bluetoothState = peripheral.state
+        switch peripheral.state {
+        case .poweredOn:
+            if wantAdvertising { publish() }
+        case .unauthorized:
+            statusText = "蓝牙未授权"
+        case .poweredOff:
+            statusText = "蓝牙已关闭"
+        default:
+            break
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
+        if let error {
+            statusText = "添加服务失败：\(error.localizedDescription)"
+            onLog?(statusText)
+            return
+        }
+        if wantAdvertising { publish() }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager,
+                           central: CBCentral,
+                           didSubscribeTo characteristic: CBCharacteristic) {
+        subscriberCount += 1
+        statusText = "已连接 \(subscriberCount) 台设备"
+        onLog?("iPad 已订阅 MIDI 通道")
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager,
+                           central: CBCentral,
+                           didUnsubscribeFrom characteristic: CBCharacteristic) {
+        subscriberCount = max(0, subscriberCount - 1)
+        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：舞台Control MIDI"
+        onLog?("iPad 已断开 MIDI 通道")
+    }
+
+    func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
+        // 发送队列恢复，无需处理
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager,
+                           didReceiveWrite requests: [CBATTRequest]) {
+        // 目前只做发送，收到写入直接确认
+        for request in requests {
+            peripheral.respond(to: request, withResult: .success)
+        }
+    }
+}

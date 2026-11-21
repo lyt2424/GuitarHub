@@ -7,6 +7,12 @@ struct PedalView: View {
 
     private var bank: PedalBank? { hub.store.activeBank }
 
+    private func removeMapping(_ mapping: PedalMapping) {
+        guard var copy = hub.store.activeBank else { return }
+        copy.mappings.removeAll { $0.id == mapping.id }
+        hub.store.updateBank(copy)
+    }
+
     private func resetCurrentBank() {
         guard let bank = hub.store.activeBank else { return }
         var replacement: PedalBank
@@ -52,24 +58,35 @@ struct PedalView: View {
                 if let bank {
                     Section {
                         ForEach(bank.mappings) { mapping in
-                            Button {
-                                editing = mapping
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(mapping.trigger.label)
-                                            .font(.caption.monospaced())
-                                            .foregroundStyle(Theme.accent)
-                                        Text(mapping.displayTitle)
-                                            .font(.subheadline)
+                            HStack {
+                                Button {
+                                    editing = mapping
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(mapping.trigger.label)
+                                                .font(.caption.monospaced())
+                                                .foregroundStyle(Theme.accent)
+                                            Text(mapping.displayTitle)
+                                                .font(.subheadline)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundStyle(.tertiary)
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
                                 }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    removeMapping(mapping)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.danger)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                         .onDelete { offsets in
                             var copy = bank

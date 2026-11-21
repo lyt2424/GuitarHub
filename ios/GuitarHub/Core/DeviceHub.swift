@@ -14,6 +14,7 @@ final class DeviceHub: ObservableObject {
     let korg: KorgController
     let pedal: PedalRouter
     let pedalInput: BLEMIDIPedal
+    let bleMIDI: BLEMIDIPeripheral
 
     @Published private(set) var devices: [AmpDevice] = []
     @Published private(set) var mode: AppMode = .launch
@@ -26,6 +27,7 @@ final class DeviceHub: ObservableObject {
         let korg = KorgController(midi: midi, store: store)
         let pedal = PedalRouter(store: store, korg: korg)
         let pedalInput = BLEMIDIPedal()
+        let bleMIDI = BLEMIDIPeripheral()
 
         self.store = store
         self.profiles = profiles
@@ -33,6 +35,8 @@ final class DeviceHub: ObservableObject {
         self.korg = korg
         self.pedal = pedal
         self.pedalInput = pedalInput
+        self.bleMIDI = bleMIDI
+        korg.blePeripheral = bleMIDI
         self.selectedDeviceID = UserDefaults.standard.string(forKey: "selected.device")
             ?? profiles.profiles.first?.id
 
@@ -162,6 +166,14 @@ final class DeviceHub: ObservableObject {
             store.data.pedalBanks[index] = PedalBank.pulzeStarter()
         }
         UserDefaults.standard.set(true, forKey: key)
+
+        let korgKey = "migration.banks.korg.v2"
+        if !UserDefaults.standard.bool(forKey: korgKey) {
+            if let index = store.data.pedalBanks.firstIndex(where: { $0.name == BankNames.keyboard }) {
+                store.data.pedalBanks[index] = PedalBank.korgStarter()
+            }
+            UserDefaults.standard.set(true, forKey: korgKey)
+        }
     }
 
     private func makeDevice(profile: DeviceProfile) -> AmpDevice {

@@ -150,8 +150,8 @@ struct PedalBank: Codable, Identifiable, Hashable {
         PedalBank(
             name: BankNames.keyboard,
             mappings: [
-                PedalMapping(trigger: .cc(number: 20), action: .korgStep(delta: 1)),
-                PedalMapping(trigger: .cc(number: 21), action: .korgStep(delta: -1)),
+                PedalMapping(trigger: .cc(number: 20), action: .korgStep(delta: -1)),
+                PedalMapping(trigger: .cc(number: 21), action: .korgStep(delta: 1)),
                 PedalMapping(trigger: .cc(number: 22), action: .korgSetlistNext),
                 PedalMapping(trigger: .cc(number: 23), action: .korgProgram(program: 0))
             ]

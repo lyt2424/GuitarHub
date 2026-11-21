@@ -10,6 +10,10 @@ final class AppStore: ObservableObject {
         var korgChannel: Int = 1
         /// KORG 的 Program Change 基准：0 或 1（有些 Set List 从 1 开始）。
         var korgPCBase: Int? = nil
+        /// 是否用 BLE MIDI 外设模式发给 iPad。
+        var korgBLEOutput: Bool? = nil
+        /// 转调（半音，-11…+11）。
+        var korgTranspose: Int? = nil
         var hapticsEnabled: Bool = true
         /// 召回音色时是否把本地保存的模块状态整包推给设备。
         var pushFullStateOnRecall: Bool = true
