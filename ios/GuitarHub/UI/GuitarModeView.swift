@@ -3,36 +3,23 @@ import CoreBluetooth
 
 struct GuitarModeView: View {
     @EnvironmentObject private var hub: DeviceHub
-
-    @State private var selectedModule: ModuleID?
     @State private var showSettings = false
-    @State private var showPresets = false
-    @State private var renaming = false
-    @State private var draftName = ""
-
-    private var device: AmpDevice? { hub.selectedDevice }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 12) {
-                        if let device {
-                            presetCard(device)
-                            moduleGrid(device)
-                            parameterPanel(device)
-                        } else {
-                            Card {
-                                Text("还没有加载设备配置。")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                if let device = hub.selectedDevice {
+                    GuitarDeviceView(device: device)
+                } else {
+                    Card {
+                        Text("还没有加载设备配置。")
+                            .foregroundStyle(.secondary)
                     }
                     .padding(14)
                 }
             }
-            .navigationTitle(device?.profile.name ?? "电吉他")
+            .navigationTitle(hub.selectedDevice?.profile.name ?? "电吉他")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -68,28 +55,45 @@ struct GuitarModeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView().environmentObject(hub)
             }
-            .sheet(isPresented: $showPresets) {
-                if let device {
-                    PresetListSheet(device: device) { index in
-                        device.selectPreset(index)
-                    }
-                }
+        }
+    }
+}
+
+/// 单独一层，用 @ObservedObject 订阅设备，这样 presetName / modules 变化时界面会实时刷新。
+private struct GuitarDeviceView: View {
+    @ObservedObject var device: AmpDevice
+
+    @State private var selectedModule: ModuleID?
+    @State private var showPresets = false
+    @State private var renaming = false
+    @State private var draftName = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                presetCard
+                moduleGrid
+                parameterPanel
             }
-            .alert("音色显示名", isPresented: $renaming) {
-                TextField("中文名", text: $draftName)
-                Button("取消", role: .cancel) {}
-                Button("保存") {
-                    device?.renameCurrentPreset(draftName)
-                }
-            } message: {
-                Text("留空则恢复设备原名。")
+            .padding(14)
+        }
+        .sheet(isPresented: $showPresets) {
+            PresetListSheet(device: device) { index in
+                device.selectPreset(index)
             }
+        }
+        .alert("音色显示名", isPresented: $renaming) {
+            TextField("中文名", text: $draftName)
+            Button("取消", role: .cancel) {}
+            Button("保存") { device.renameCurrentPreset(draftName) }
+        } message: {
+            Text("留空则恢复默认名称。")
         }
     }
 
     // MARK: - 音色卡
 
-    private func presetCard(_ device: AmpDevice) -> some View {
+    private var presetCard: some View {
         Card {
             VStack(spacing: 10) {
                 HStack {
@@ -97,22 +101,20 @@ struct GuitarModeView: View {
                         .font(.caption)
                         .foregroundStyle(device.status.isConnected ? Theme.onColor : .secondary)
                     Spacer()
-                    Text("预设 \(device.presetIndex + 1) / \(device.effectivePresetCount)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .onTapGesture { showPresets = true }
                     Button {
                         showPresets = true
                     } label: {
-                        Image(systemName: "list.bullet")
-                            .font(.caption)
+                        Text("预设 \(device.presetIndex + 1) / \(device.effectivePresetCount)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     }
+                    .buttonStyle(.plain)
                 }
 
                 if !device.status.isConnected {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle")
-                        Text(bluetoothHint(device))
+                        Text(bluetoothHint)
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -203,12 +205,12 @@ struct GuitarModeView: View {
         }
     }
 
-    private func bluetoothHint(_ device: AmpDevice) -> String {
+    private var bluetoothHint: String {
         switch device.bluetoothState {
         case .poweredOn:
             if device.isScanning {
                 return device.candidates.isEmpty
-                    ? "正在搜索附近蓝牙设备…（约 6 秒后改为全量扫描）"
+                    ? "正在搜索附近蓝牙设备…"
                     : "发现 \(device.candidates.count) 台设备，点名字连接"
             }
             return "点上方按钮开始搜索"
@@ -225,7 +227,7 @@ struct GuitarModeView: View {
 
     // MARK: - 颜色块
 
-    private func moduleGrid(_ device: AmpDevice) -> some View {
+    private var moduleGrid: some View {
         let modules = device.modules.filter { !(device.profile.module($0.id)?.isGlobal ?? false) }
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
             ForEach(modules) { state in
@@ -233,7 +235,7 @@ struct GuitarModeView: View {
                     ModuleBlock(
                         spec: spec,
                         enabled: state.enabled,
-                        selected: activeModule(device) == state.id,
+                        selected: activeModule == state.id,
                         onToggle: {
                             selectedModule = state.id
                             device.toggleModule(state.id)
@@ -247,15 +249,15 @@ struct GuitarModeView: View {
         }
     }
 
-    private func activeModule(_ device: AmpDevice) -> ModuleID? {
+    private var activeModule: ModuleID? {
         selectedModule ?? device.modules.first { !(device.profile.module($0.id)?.isGlobal ?? false) }?.id
     }
 
     // MARK: - 参数
 
     @ViewBuilder
-    private func parameterPanel(_ device: AmpDevice) -> some View {
-        if let moduleID = activeModule(device),
+    private var parameterPanel: some View {
+        if let moduleID = activeModule,
            let spec = device.profile.module(moduleID) {
             let params = device.visibleParams(moduleID)
             Card {
@@ -308,38 +310,50 @@ struct GuitarModeView: View {
     }
 }
 
-// MARK: - 音色表（可改名、可跳转）
+// MARK: - 音色表
 
 struct PresetListSheet: View {
     @ObservedObject var device: AmpDevice
     let onSelect: (Int) -> Void
+
     @Environment(\.dismiss) private var dismiss
+    @State private var renamingIndex: Int?
+    @State private var draft = ""
 
     var body: some View {
         NavigationStack {
             List {
                 ForEach(0..<device.effectivePresetCount, id: \.self) { index in
-                    HStack(spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(.caption.monospacedDigit())
-                            .frame(width: 34, alignment: .leading)
-                            .foregroundStyle(index == device.presetIndex ? Theme.accent : .secondary)
-
-                        TextField("显示名", text: Binding(
-                            get: { device.displayName(at: index) },
-                            set: { device.renamePreset($0, at: index) }
-                        ))
-                        .font(.subheadline)
-
-                        if index == device.presetIndex {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Theme.accent)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
+                    Button {
                         onSelect(index)
                         dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text("\(index + 1)")
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 34, alignment: .leading)
+                                .foregroundStyle(index == device.presetIndex ? Theme.accent : .secondary)
+
+                            Text(device.displayName(at: index))
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            if index == device.presetIndex {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Theme.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions {
+                        Button("改名") {
+                            draft = device.displayName(at: index)
+                            renamingIndex = index
+                        }
+                        .tint(Theme.accent)
                     }
                 }
             }
@@ -349,6 +363,20 @@ struct PresetListSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
                 }
+            }
+            .alert("改名", isPresented: Binding(
+                get: { renamingIndex != nil },
+                set: { if !$0 { renamingIndex = nil } }
+            )) {
+                TextField("显示名", text: $draft)
+                Button("取消", role: .cancel) {}
+                Button("保存") {
+                    if let index = renamingIndex {
+                        device.renamePreset(draft, at: index)
+                    }
+                }
+            } message: {
+                Text("长按列表项左滑也可以改名。")
             }
         }
     }
