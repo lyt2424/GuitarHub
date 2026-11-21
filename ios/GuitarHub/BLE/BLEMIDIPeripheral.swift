@@ -11,6 +11,7 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
     @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var statusText = "未开启"
     @Published private(set) var lastPacket = "—"
+    @Published private(set) var eventLog: [String] = []
 
     var onLog: ((String) -> Void)?
 
@@ -20,6 +21,19 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
     private var wantAdvertising = false
 
     var hasSubscribers: Bool { subscriberCount > 0 }
+
+    private func logEvent(_ text: String) {
+        let stamp = Self.formatter.string(from: Date())
+        eventLog.append("[\(stamp)] \(text)")
+        if eventLog.count > 40 { eventLog.removeFirst(eventLog.count - 40) }
+        onLog?(text)
+    }
+
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
 
     func start() {
         wantAdvertising = true
@@ -141,15 +155,15 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
                            didSubscribeTo characteristic: CBCharacteristic) {
         subscriberCount += 1
         statusText = "已连接 \(subscriberCount) 台设备"
-        onLog?("iPad 已订阅 MIDI 通道（\(central.identifier.uuidString.prefix(8))）")
+        logEvent("订阅通知：\(central.identifier.uuidString.prefix(8))")
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
                            central: CBCentral,
                            didUnsubscribeFrom characteristic: CBCharacteristic) {
         subscriberCount = max(0, subscriberCount - 1)
-        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：舞台Control MIDI"
-        onLog?("iPad 已断开 MIDI 通道")
+        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：StageControl MIDI"
+        logEvent("取消订阅：\(central.identifier.uuidString.prefix(8))")
     }
 
     func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
@@ -161,6 +175,7 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
         // 返回一个合法的空 MIDI 包，满足先读后订阅的实现。
         request.value = Data([0x80, 0x00])
         peripheral.respond(to: request, withResult: .success)
+        logEvent("对方读取特征")
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
@@ -169,5 +184,6 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
         for request in requests {
             peripheral.respond(to: request, withResult: .success)
         }
+        logEvent("对方写入特征 \(requests.count) 次")
     }
 }

@@ -191,6 +191,12 @@ struct KorgScreen: View {
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .textSelection(.enabled)
+
+                    ForEach(Array(ble.eventLog.suffix(4).enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
                 } else {
                     HStack(spacing: 8) {
                         StatusDot(status: midi.isReady ? .connected : .failed("未就绪"))
