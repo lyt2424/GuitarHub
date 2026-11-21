@@ -74,6 +74,7 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
 
     private func publish() {
         guard let manager else { return }
+        if isAdvertising { return }
         if !serviceAdded {
             let char = CBMutableCharacteristic(
                 type: BLEMIDI.characteristicUUID,
@@ -91,16 +92,18 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
         }
         // 等 GATT 数据库稳定后再广播，避免 central 连得太快、服务还没就绪。
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self, self.wantAdvertising, let manager = self.manager else { return }
+            guard let self, self.wantAdvertising, !self.isAdvertising,
+                  let manager = self.manager else { return }
+            // 名字尽量短，保证 128 位服务 UUID 能留在广播包里。
             manager.startAdvertising([
                 CBAdvertisementDataServiceUUIDsKey: [BLEMIDI.serviceUUID],
-                CBAdvertisementDataLocalNameKey: "StageControl MIDI"
+                CBAdvertisementDataLocalNameKey: "SC-MIDI"
             ])
             self.isAdvertising = true
             self.statusText = self.subscriberCount > 0
                 ? "已连接 \(self.subscriberCount) 台设备"
-                : "广播中：StageControl MIDI"
-            self.onLog?("BLE MIDI 外设广播已开启")
+                : "广播中：SC-MIDI"
+            self.logEvent("开始广播 SC-MIDI")
         }
     }
 
@@ -172,7 +175,7 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
                            central: CBCentral,
                            didUnsubscribeFrom characteristic: CBCharacteristic) {
         subscriberCount = max(0, subscriberCount - 1)
-        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：StageControl MIDI"
+        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：SC-MIDI"
         logEvent("取消订阅：\(central.identifier.uuidString.prefix(8))")
     }
 

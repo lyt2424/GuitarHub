@@ -184,7 +184,7 @@ struct KorgScreen: View {
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(ble.subscriberCount > 0 ? Theme.onColor : Theme.danger)
                     }
-                    Text("在 iPad 的 Module → 设置 → Bluetooth MIDI 里找到并连接 “StageControl MIDI”。")
+                    Text("在 iPad 的 Module → 设置 → Bluetooth MIDI 里找到并连接 “SC-MIDI”。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Text("最近发送：\(ble.lastPacket)")
