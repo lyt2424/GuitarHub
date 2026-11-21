@@ -214,7 +214,7 @@ final class MIDIService: ObservableObject {
                     }
                 }
             }
-            packetPtr = MIDIPacketNext(packetPtr)
+            packetPtr = UnsafePointer(MIDIPacketNext(packetPtr))
         }
     }
 
@@ -234,7 +234,7 @@ final class MIDIService: ObservableObject {
                                      MemoryLayout<MIDIPacketList>.size,
                                      packet,
                                      0,
-                                     ByteCount(bytes.count),
+                                     bytes.count,
                                      base)
         }
         guard added != nil else { return }

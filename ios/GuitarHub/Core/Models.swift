@@ -168,7 +168,7 @@ struct DeviceProfile: Identifiable, Codable, Hashable {
     }
 
     func parameter(module: ModuleID, param: Int) -> ParameterSpec? {
-        module(module)?.params.first { $0.id == param }
+        self.module(module)?.params.first { $0.id == param }
     }
 
     func moduleBySlot(_ slot: Int) -> ModuleSpec? {
@@ -322,8 +322,9 @@ struct ParameterSpec: Identifiable, Codable, Hashable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.value(.id, default: 0)
-        name = c.value(.name, default: "参数 \(id)")
+        let decodedID = c.value(.id, default: 0)
+        id = decodedID
+        name = c.value(.name, default: "参数 \(decodedID)")
         minValue = c.value(.minValue, default: 0)
         maxValue = c.value(.maxValue, default: 100)
         unit = c.value(.unit, default: "")

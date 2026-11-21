@@ -20,7 +20,7 @@ struct PedalView: View {
 
                 Section("踏板组") {
                     Picker("当前组", selection: Binding(
-                        get: { hub.store.activeBankID ?? bank?.id },
+                        get: { hub.store.data.activeBankID ?? bank?.id },
                         set: { hub.store.data.activeBankID = $0 }
                     )) {
                         ForEach(hub.store.data.pedalBanks) { item in
