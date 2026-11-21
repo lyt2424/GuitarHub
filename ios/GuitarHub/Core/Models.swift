@@ -343,6 +343,7 @@ struct ParameterSpec: Identifiable, Codable, Hashable {
 struct ParamMapping: Codable, Hashable {
     var kind: Kind = .readOnly
     var cc: Int? = nil
+    var cc2: Int? = nil
     var ccMin: Int = 0
     var ccMax: Int = 127
     var slot: Int? = nil
@@ -351,18 +352,21 @@ struct ParamMapping: Codable, Hashable {
     enum Kind: String, Codable, CaseIterable, Identifiable {
         case readOnly
         case cc
+        /// 14 位参数（如 BPM）：cc 是 MSB，cc2 是 LSB。
+        case ccPair
         case sparkParam
         var id: String { rawValue }
         var label: String {
             switch self {
             case .readOnly:   return "只读"
             case .cc:         return "MIDI CC"
+            case .ccPair:     return "MIDI CC（双字节）"
             case .sparkParam: return "Spark 参数"
             }
         }
     }
 
-    enum CodingKeys: String, CodingKey { case kind, cc, ccMin, ccMax, slot, param }
+    enum CodingKeys: String, CodingKey { case kind, cc, cc2, ccMin, ccMax, slot, param }
 
     init() {}
 
@@ -370,6 +374,7 @@ struct ParamMapping: Codable, Hashable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = c.value(.kind, default: .readOnly)
         cc = c.optional(.cc)
+        cc2 = c.optional(.cc2)
         ccMin = c.value(.ccMin, default: 0)
         ccMax = c.value(.ccMax, default: 127)
         slot = c.optional(.slot)

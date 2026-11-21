@@ -124,7 +124,7 @@
       "params": [
         {
           "id": 0,
-          "name": "总音量",
+          "name": "音色音量",
           "minValue": 0,
           "maxValue": 100,
           "defaultValue": 50,
@@ -136,6 +136,42 @@
       ],
       "shortName": "VOL",
       "colorHex": "#64748B"
+    },
+    {
+      "id": "drum",
+      "name": "鼓机",
+      "isGlobal": true,
+      "bypass": {
+        "kind": "cc",
+        "cc": 60,
+        "onValue": 127,
+        "offValue": 0
+      },
+      "params": [
+        {
+          "id": 0,
+          "name": "速度",
+          "minValue": 40,
+          "maxValue": 300,
+          "defaultValue": 120,
+          "mapping": {
+            "kind": "ccPair",
+            "cc": 62,
+            "cc2": 63
+          }
+        },
+        {
+          "id": 1,
+          "name": "风格",
+          "minValue": 0,
+          "maxValue": 99,
+          "defaultValue": 0,
+          "mapping": {
+            "kind": "cc",
+            "cc": 67
+          }
+        }
+      ]
     }
   ]
 }

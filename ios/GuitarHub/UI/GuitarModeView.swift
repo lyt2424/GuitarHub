@@ -74,6 +74,7 @@ private struct GuitarDeviceView: View {
             VStack(spacing: 12) {
                 presetCard
                 moduleGrid
+                drumPanel
                 globalPanel
                 parameterPanel
             }
@@ -144,22 +145,14 @@ private struct GuitarDeviceView: View {
                     renaming = true
                 }
 
-                HStack(spacing: 9) {
-                    BigControlButton(systemImage: "chevron.left", title: "上一") {
-                        device.stepPreset(-1)
-                    }
-                    BigControlButton(systemImage: "chevron.right", title: "下一") {
-                        device.stepPreset(1)
-                    }
-                    BigControlButton(systemImage: "arrow.clockwise", title: "读取") {
-                        device.requestState()
-                    }
-                    if device.profile.capabilities.tapTempo {
-                        BigControlButton(systemImage: "metronome", title: "Tap") {
-                            device.tapTempo()
-                        }
-                    }
+                HStack(spacing: 10) {
+                    iconButton("chevron.left") { device.stepPreset(-1) }
+                    iconButton("chevron.right") { device.stepPreset(1) }
+                    iconButton("arrow.clockwise", size: 16) { device.requestState() }
                     Spacer(minLength: 0)
+                    if device.profile.capabilities.tapTempo {
+                        tapButton
+                    }
                 }
 
                 if !device.status.isConnected {
@@ -205,6 +198,93 @@ private struct GuitarDeviceView: View {
                 }
             }
         }
+    }
+
+    private func iconButton(_ systemImage: String, size: CGFloat = 18, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: size, weight: .bold))
+                .frame(width: 56, height: 46)
+                .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// TAP 竖排：上面 TAP，下面当前 BPM。
+    private var tapButton: some View {
+        Button {
+            device.tapTempo()
+        } label: {
+            VStack(spacing: 1) {
+                Text("TAP")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                Text(bpmText)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 60, height: 46)
+            .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var bpmText: String {
+        guard let drum = device.moduleState("drum") else { return "— BPM" }
+        return "\(Int(drum.value(0, fallback: 120))) BPM"
+    }
+
+    // MARK: - 鼓机
+
+    @ViewBuilder
+    private var drumPanel: some View {
+        if device.profile.module("drum") != nil, device.moduleState("drum") != nil {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("鼓机").font(.headline)
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { device.isModuleEnabled("drum") },
+                            set: { device.setModule("drum", enabled: $0) }
+                        ))
+                        .labelsHidden()
+                        .tint(Theme.onColor)
+                    }
+
+                    HStack(spacing: 12) {
+                        Button {
+                            bumpDrumStyle()
+                        } label: {
+                            Label("下一个节奏", systemImage: "forward.end")
+                                .font(.footnote.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+
+                        Text("\(Int(device.value("drum", 0))) BPM")
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { device.value("drum", 0) },
+                            set: { device.setParameter("drum", param: 0, value: $0) }
+                        ),
+                        in: 40...300,
+                        step: 1
+                    )
+                    .tint(Theme.accent)
+                }
+            }
+        }
+    }
+
+    private func bumpDrumStyle() {
+        let current = device.value("drum", 1)
+        let next = current >= 99 ? 0 : current + 1
+        device.setParameter("drum", param: 1, value: next)
     }
 
     private var bluetoothHint: String {
@@ -257,7 +337,9 @@ private struct GuitarDeviceView: View {
 
     @ViewBuilder
     private var globalPanel: some View {
-        let globals = device.modules.filter { device.profile.module($0.id)?.isGlobal ?? false }
+        let globals = device.modules.filter {
+            (device.profile.module($0.id)?.isGlobal ?? false) && $0.id != "drum"
+        }
         if !globals.isEmpty {
             Card {
                 VStack(alignment: .leading, spacing: 10) {
@@ -303,7 +385,8 @@ private struct GuitarDeviceView: View {
     @ViewBuilder
     private var parameterPanel: some View {
         if let moduleID = activeModule,
-           let spec = device.profile.module(moduleID) {
+           let spec = device.profile.module(moduleID),
+           !device.visibleParams(moduleID).isEmpty {
             let params = device.visibleParams(moduleID)
             Card {
                 VStack(alignment: .leading, spacing: 12) {

@@ -87,8 +87,31 @@ final class MIDICodec: DeviceCodec {
     }
 
     func setParameter(_ module: ModuleID, param: Int, value: Double) {
-        guard let spec = profile.parameter(module: module, param: param),
-              let cc = spec.mapping.cc else { return }
+        guard let spec = profile.parameter(module: module, param: param) else { return }
+
+        // 14 位参数（BPM 之类）：MSB/LSB 两个 CC。
+        if spec.mapping.kind == .ccPair,
+           let msbCC = spec.mapping.cc,
+           let lsbCC = spec.mapping.cc2 {
+            let bpm = Int(value.rounded().clamped(to: 40...300))
+            let msb: Int
+            let lsb: Int
+            if bpm < 128 {
+                msb = 0
+                lsb = bpm
+            } else if bpm < 256 {
+                msb = 1
+                lsb = bpm - 128
+            } else {
+                msb = 2
+                lsb = bpm - 256
+            }
+            sendCC(msbCC, msb)
+            sendCC(lsbCC, lsb)
+            return
+        }
+
+        guard let cc = spec.mapping.cc else { return }
         let span = spec.maxValue - spec.minValue
         let ratio = span > 0 ? (value - spec.minValue) / span : 0
         let midi = Int((ratio * 127).rounded()).clamped(to: 0...127)
