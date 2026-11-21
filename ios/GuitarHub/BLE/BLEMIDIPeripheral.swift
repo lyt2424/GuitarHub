@@ -63,7 +63,8 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
         if !serviceAdded {
             let char = CBMutableCharacteristic(
                 type: BLEMIDI.characteristicUUID,
-                properties: [.notify, .write, .writeWithoutResponse, .read],
+                // 同时提供 notify 和 indicate：不同 App 的 BLE MIDI 实现订阅方式不同。
+                properties: [.notify, .indicate, .write, .writeWithoutResponse, .read],
                 value: nil,
                 permissions: [.readable, .writeable]
             )
@@ -134,7 +135,7 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
                            didSubscribeTo characteristic: CBCharacteristic) {
         subscriberCount += 1
         statusText = "已连接 \(subscriberCount) 台设备"
-        onLog?("iPad 已订阅 MIDI 通道")
+        onLog?("iPad 已订阅 MIDI 通道（\(central.identifier.uuidString.prefix(8))）")
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
@@ -147,6 +148,13 @@ extension BLEMIDIPeripheral: CBPeripheralManagerDelegate {
 
     func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
         // 发送队列恢复，无需处理
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager,
+                           didReceiveRead request: CBATTRequest) {
+        // 返回一个合法的空 MIDI 包，满足先读后订阅的实现。
+        request.value = Data([0x80, 0x00])
+        peripheral.respond(to: request, withResult: .success)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager,
