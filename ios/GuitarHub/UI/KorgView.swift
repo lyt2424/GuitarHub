@@ -180,9 +180,9 @@ struct KorgScreen: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(ble.subscriberCount) 台")
+                        Text("订阅 \(ble.subscriberCount)")
                             .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ble.subscriberCount > 0 ? Theme.onColor : Theme.danger)
                     }
                     Text("在 iPad 的 Module → 设置 → Bluetooth MIDI 里找到并连接 “舞台Control MIDI”。")
                         .font(.caption2)

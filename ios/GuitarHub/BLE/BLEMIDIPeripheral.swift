@@ -78,7 +78,12 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
         guard let manager, let char = characteristic, !midi.isEmpty else { return }
         let data = BLEMIDI.encode(midi)
         lastPacket = [UInt8](data).map { String(format: "%02X", $0) }.joined(separator: " ")
+        if subscriberCount == 0 {
+            statusText = "无订阅者：包没有发出"
+            return
+        }
         let ok = manager.updateValue(data, for: char, onSubscribedCentrals: nil)
+        statusText = "已连接 \(subscriberCount) 台设备"
         if !ok {
             // 发送队列满：稍后重试一次
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in

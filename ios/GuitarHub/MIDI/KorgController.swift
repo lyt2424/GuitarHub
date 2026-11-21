@@ -91,13 +91,14 @@ final class KorgController: ObservableObject {
     }
 
     private func sendMessage(_ message: MIDIMessage, description: String) {
-        let useBLE = (store.data.settings.korgBLEOutput ?? false) && (blePeripheral?.hasSubscribers ?? false)
+        let useBLE = store.data.settings.korgBLEOutput ?? false
         if useBLE {
             blePeripheral?.send(message.bytes)
         } else {
             midi.send([message], description: description)
         }
-        lastSendDescription = useBLE ? "\(description)（BLE）" : description
+        let subs = blePeripheral?.subscriberCount ?? 0
+        lastSendDescription = useBLE ? "\(description)（BLE 订阅 \(subs)）" : description
     }
 
     private func sendPC(_ program: Int) {
@@ -129,8 +130,7 @@ final class KorgController: ObservableObject {
                 guard let self else { return }
                 let ch = offset + 1
                 let message = MIDIMessage.programChange(channel: ch, program: base)
-                let useBLE = (self.store.data.settings.korgBLEOutput ?? false)
-                    && (self.blePeripheral?.hasSubscribers ?? false)
+                let useBLE = self.store.data.settings.korgBLEOutput ?? false
                 if useBLE {
                     self.blePeripheral?.send(message.bytes)
                 } else {
