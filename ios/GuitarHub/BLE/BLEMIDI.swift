@@ -40,9 +40,10 @@ enum BLEMIDI {
         // 注意：毫秒时间戳约 1.8e12，必须先取模再转 UInt16，否则运行时直接崩。
         let millis = UInt64(Date().timeIntervalSince1970 * 1000)
         let timestamp = UInt16(millis & 0x1FFF)
+        // 包头最高位=1；时间戳低 7 位的最高位必须为 0（0x00…0x7F）。
         var out: [UInt8] = [
             0x80 | UInt8((timestamp >> 7) & 0x3F),
-            0x80 | UInt8(timestamp & 0x7F)
+            UInt8(timestamp & 0x7F)
         ]
         out.append(contentsOf: midi)
         return Data(out)
