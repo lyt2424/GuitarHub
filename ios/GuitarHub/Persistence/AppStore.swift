@@ -30,7 +30,7 @@ final class AppStore: ObservableObject {
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            snapshots = (try? c.decode([Int: AmpSnapshot].self, forKey: .snapshots)) ?? []
+            snapshots = (try? c.decode([Int: AmpSnapshot].self, forKey: .snapshots)) ?? [:]
             lastUsedPreset = (try? c.decode(Int.self, forKey: .lastUsedPreset)) ?? 0
             aliases = (try? c.decode([Int: String].self, forKey: .aliases)) ?? [:]
         }
