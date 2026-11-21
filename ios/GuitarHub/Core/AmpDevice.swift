@@ -71,6 +71,9 @@ final class AmpDevice: ObservableObject, Identifiable {
             self?.recordTraffic(direction: "←", data: data)
             self?.codec.didReceive(data)
         }
+        session.onSend = { [weak self] data in
+            self?.recordTraffic(direction: "→", data: data)
+        }
         session.onConnect = { [weak self] in
             guard let self else { return }
             self.codec.didConnect()

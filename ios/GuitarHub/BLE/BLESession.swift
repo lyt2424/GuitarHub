@@ -21,9 +21,15 @@ final class BLESession: NSObject, ObservableObject {
     /// 只扫描这些服务；nil 表示扫描全部。
     var serviceFilter: [CBUUID]?
 
+    /// 显式指定要写入 / 订阅的特征（BLE MIDI 必须指定，否则可能写到私有服务里）。
+    var writeCharacteristicUUID: CBUUID?
+    var notifyCharacteristicUUID: CBUUID?
+
     var onConnect: (() -> Void)?
     var onDisconnect: ((String?) -> Void)?
     var onData: ((Data) -> Void)?
+    /// 本机发出的原始字节（调试用）。
+    var onSend: ((Data) -> Void)?
     var onLog: ((String) -> Void)?
     /// 每次发现 GATT 结构后回调，便于调试界面展示。
     var onProfile: ((String) -> Void)?
@@ -175,6 +181,7 @@ final class BLESession: NSObject, ObservableObject {
             type = .withResponse
         }
         target.writeValue(data, for: char, type: type)
+        onSend?(data)
     }
 
     /// 按 BLE 单包上限切片，并以固定间隔发送（很多音箱要求慢速、顺序写入）。
@@ -332,14 +339,17 @@ extension BLESession: CBPeripheralDelegate {
         log("服务 \(service.uuid.uuidString)：\(chars.map { $0.uuid.uuidString }.joined(separator: ", "))")
 
         for char in chars {
-            if char.properties.contains(.notify) || char.properties.contains(.indicate) {
+            let notifyMatches = notifyCharacteristicUUID == nil || char.uuid == notifyCharacteristicUUID
+            let writeMatches = writeCharacteristicUUID == nil || char.uuid == writeCharacteristicUUID
+
+            if (char.properties.contains(.notify) || char.properties.contains(.indicate)), notifyMatches {
                 if !notifyChars.contains(where: { $0.uuid == char.uuid }) {
                     notifyChars.append(char)
                 }
                 peripheral.setNotifyValue(true, for: char)
             }
-            if (char.properties.contains(.writeWithoutResponse) || char.properties.contains(.write))
-                && writeChar == nil {
+            if (char.properties.contains(.writeWithoutResponse) || char.properties.contains(.write)),
+               writeMatches, writeChar == nil {
                 writeChar = char
             }
         }
@@ -392,8 +402,9 @@ extension BLESession: CBPeripheralDelegate {
     private func finishDiscovery(_ peripheral: CBPeripheral) {
         didFinishDiscovery = true
         if writeChar == nil {
-            status = .failed("设备没有可写特征")
-            log("没有可写特征，无法控制该设备")
+            let wanted = writeCharacteristicUUID?.uuidString ?? "任意可写特征"
+            status = .failed("没有找到写入特征（期望 \(wanted)）")
+            log("没有找到写入特征（期望 \(wanted)），请检查设备配置里的 writeCharacteristic")
             return
         }
         status = .connected

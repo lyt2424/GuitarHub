@@ -147,6 +147,12 @@ final class DeviceHub: ObservableObject {
         if !transport.serviceUUIDs.isEmpty {
             session.serviceFilter = transport.serviceUUIDs.map { CBUUID(string: $0) }
         }
+        if !transport.writeCharacteristic.isEmpty {
+            session.writeCharacteristicUUID = CBUUID(string: transport.writeCharacteristic)
+        }
+        if !transport.notifyCharacteristic.isEmpty {
+            session.notifyCharacteristicUUID = CBUUID(string: transport.notifyCharacteristic)
+        }
 
         let codec: DeviceCodec
         switch transport.codec {

@@ -12,7 +12,9 @@
     "chunkIntervalMs": 6,
     "blockHeader": false,
     "midiChannel": 1,
-    "tapTempoCC": 76
+    "tapTempoCC": 76,
+    "writeCharacteristic": "7772E5DB-3868-4112-A1A9-F2669D106BF3",
+    "notifyCharacteristic": "7772E5DB-3868-4112-A1A9-F2669D106BF3"
   },
   "capabilities": {
     "stateReadback": false,
@@ -122,9 +124,10 @@
       "params": [
         {
           "id": 0,
-          "name": "音色音量",
+          "name": "总音量",
           "minValue": 0,
           "maxValue": 100,
+          "defaultValue": 50,
           "mapping": {
             "kind": "cc",
             "cc": 7
@@ -132,32 +135,24 @@
         },
         {
           "id": 1,
-          "name": "乐器音量",
-          "minValue": 0,
-          "maxValue": 100,
-          "mapping": {
-            "kind": "cc",
-            "cc": 8
-          }
-        },
-        {
-          "id": 2,
           "name": "蓝牙音量",
           "minValue": 0,
           "maxValue": 100,
+          "defaultValue": 50,
           "mapping": {
             "kind": "cc",
             "cc": 9
           }
         },
         {
-          "id": 3,
-          "name": "辅助输入",
+          "id": 2,
+          "name": "乐器音量",
           "minValue": 0,
           "maxValue": 100,
+          "defaultValue": 50,
           "mapping": {
             "kind": "cc",
-            "cc": 10
+            "cc": 8
           }
         }
       ],
