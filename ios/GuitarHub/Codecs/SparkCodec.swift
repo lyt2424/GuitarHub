@@ -106,13 +106,13 @@ final class SparkCodec: DeviceCodec {
         var reader = SparkPayloadReader(payload)
         let pedalName = reader.string()
         let on = reader.byte() == 0xC3
-        guard let module = module(forPedalName: pedalName) else { return }
-        preset?.pedals = preset?.pedals ?? []
-        if let slot = module.slot, var pedals = preset?.pedals, slot < pedals.count {
+        guard let moduleSpec = self.module(forPedalName: pedalName) else { return }
+        if let slot = moduleSpec.slot, slot < (preset?.pedals.count ?? 0) {
+            var pedals = preset?.pedals ?? []
             pedals[slot].enabled = on
             preset?.pedals = pedals
         }
-        eventHandler?(.moduleChanged(module: module.id, enabled: on))
+        eventHandler?(.moduleChanged(module: moduleSpec.id, enabled: on))
     }
 
     private func handleParameter(_ payload: [UInt8]) {
@@ -120,19 +120,20 @@ final class SparkCodec: DeviceCodec {
         let pedalName = reader.string()
         guard let paramIndex = reader.byte() else { return }
         let value = reader.float(expected: 0...1)
-        guard let module = module(forPedalName: pedalName) else { return }
+        guard let moduleSpec = self.module(forPedalName: pedalName) else { return }
         var display = Double(value) * 100
-        if let spec = module.params.first(where: { $0.mapping.param == Int(paramIndex) }) {
+        if let spec = moduleSpec.params.first(where: { $0.mapping.param == Int(paramIndex) }) {
             let ratio = Double(value)
             display = spec.minValue + ratio * (spec.maxValue - spec.minValue)
         }
-        if let slot = module.slot, var pedals = preset?.pedals, slot < pedals.count {
+        if let slot = moduleSpec.slot, slot < (preset?.pedals.count ?? 0) {
+            var pedals = preset?.pedals ?? []
             if Int(paramIndex) < pedals[slot].params.count {
                 pedals[slot].params[Int(paramIndex)] = value
                 preset?.pedals = pedals
             }
         }
-        eventHandler?(.paramChanged(module: module.id, param: Int(paramIndex), value: display))
+        eventHandler?(.paramChanged(module: moduleSpec.id, param: Int(paramIndex), value: display))
     }
 
     private func apply(_ parsed: SparkPreset) {
