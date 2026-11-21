@@ -75,13 +75,19 @@ final class BLEMIDIPeripheral: NSObject, ObservableObject {
             serviceAdded = true
             return   // 等 didAdd 回调再开始广播
         }
-        manager.startAdvertising([
-            CBAdvertisementDataServiceUUIDsKey: [BLEMIDI.serviceUUID],
-            CBAdvertisementDataLocalNameKey: "舞台Control MIDI"
-        ])
-        isAdvertising = true
-        statusText = subscriberCount > 0 ? "已连接 \(subscriberCount) 台设备" : "广播中：舞台Control MIDI"
-        onLog?("BLE MIDI 外设广播已开启")
+        // 等 GATT 数据库稳定后再广播，避免 central 连得太快、服务还没就绪。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.wantAdvertising, let manager = self.manager else { return }
+            manager.startAdvertising([
+                CBAdvertisementDataServiceUUIDsKey: [BLEMIDI.serviceUUID],
+                CBAdvertisementDataLocalNameKey: "StageControl MIDI"
+            ])
+            self.isAdvertising = true
+            self.statusText = self.subscriberCount > 0
+                ? "已连接 \(self.subscriberCount) 台设备"
+                : "广播中：StageControl MIDI"
+            self.onLog?("BLE MIDI 外设广播已开启")
+        }
     }
 
     /// 发送纯 MIDI 字节（内部封装成 BLE MIDI 包）。

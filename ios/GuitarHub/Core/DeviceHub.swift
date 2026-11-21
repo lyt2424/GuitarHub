@@ -65,9 +65,6 @@ final class DeviceHub: ObservableObject {
 
     /// 从后台回到前台：刷新 BLE MIDI 广播、补一次自动连接。
     func onAppActive() {
-        if store.data.settings.korgBLEOutput ?? false {
-            bleMIDI.refreshAdvertising()
-        }
         prepareAutoConnect()
     }
 
