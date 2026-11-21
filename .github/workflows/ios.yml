@@ -5,10 +5,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build:
-    runs-on: macos-15-intel   # Intel 机器；arm64 的 macos-14 在当前账号下不被支持
-    timeout-minutes: 30
+    runs-on: macos-15-intel
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +26,7 @@ jobs:
       - name: Build GuitarHub (unsigned)
         working-directory: ios
         run: |
+          set -o pipefail
           xcodebuild \
             -project GuitarHub.xcodeproj \
             -scheme GuitarHub \
@@ -31,9 +36,46 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee ../build.log
+
+      - name: Summarize build errors
+        if: failure()
+        run: |
+          {
+            echo "## 编译错误"
+            echo '```'
+            grep -E "error:" build.log | head -40 || echo "日志里没有匹配到 error: 行，请查看 build-log 产物。"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report build errors to issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "提交：\`${{ github.sha }}\`"
+            echo ""
+            echo "运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo '```'
+            grep -E "error:" build.log | head -60 || echo "未捕获 error: 行"
+            echo '```'
+          } > errors.md
+          gh issue create \
+            --title "CI build failed: ${GITHUB_SHA:0:7}" \
+            --body-file errors.md || true
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
 
       - name: Package IPA
+        if: success()
         run: |
           set -e
           rm -rf Payload
@@ -44,6 +86,7 @@ jobs:
           ls -lh *.ipa
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: unsigned-ipa
           path: "GuitarHub-unsigned.ipa"
