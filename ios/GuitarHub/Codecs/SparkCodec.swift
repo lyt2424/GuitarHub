@@ -153,6 +153,7 @@ final class SparkCodec: DeviceCodec {
 
     private func apply(_ parsed: SparkPreset) {
         preset = parsed
+        eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
         let index = parsed.presetNumber < 8 ? parsed.presetNumber : parsed.currentPreset
         var modules: [ModuleState] = []
 
