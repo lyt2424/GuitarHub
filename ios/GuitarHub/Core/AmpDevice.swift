@@ -174,9 +174,9 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetReloadWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: work)
 
-            // 音箱切换需要时间，0.5 秒这次可能被忽略；1.3 秒再读一次。
+            // 音箱切换需要时间，0.7 秒这次可能被忽略；1.5 秒再读一次。
             let retry = DispatchWorkItem { [weak self] in
                 guard let self, self.awaitingPresetResponse else { return }
                 if let spark = self.codec as? SparkCodec {
@@ -185,7 +185,7 @@ final class AmpDevice: ObservableObject, Identifiable {
                     self.codec.requestState()
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3, execute: retry)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: retry)
 
             // 2.2 秒仍未回状态：解除等待，读一次当前状态兜底。
             presetTimeoutWork?.cancel()
