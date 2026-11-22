@@ -166,7 +166,8 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetReloadWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+            awaitingPresetResponse = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
             store.setLastUsedPreset(index, for: profile.id)
             return
         }
@@ -329,6 +330,12 @@ final class AmpDevice: ObservableObject, Identifiable {
         case .disconnected(let reason):
             if let reason { lastError = reason }
         case .stateLoaded(let snap):
+            // 连踩时旧请求的回包可能晚到：序号对不上就丢掉，避免把新切的音色覆盖回旧的。
+            if awaitingPresetResponse, snap.presetIndex != presetIndex {
+                log("忽略过期的音色状态（\(snap.presetIndex + 1)）")
+                return
+            }
+            awaitingPresetResponse = false
             presetIndex = snap.presetIndex
             presetName = store.alias(profile.id, index: snap.presetIndex)
                 ?? (profile.capabilities.stateReadback ? "预设 \(snap.presetIndex + 1)" : snap.name)
@@ -363,6 +370,7 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     private var captureWork: DispatchWorkItem?
     private var presetReloadWork: DispatchWorkItem?
+    private var awaitingPresetResponse = false
 
     /// 拖动参数时不要每一帧都写盘：合并到停止操作 0.6 秒后再存。
     private func scheduleCapture() {
