@@ -158,6 +158,21 @@ final class DeviceHub: ObservableObject {
             store.data.pedalBanks[index] = PedalBank.pulzeStarter()
         }
         UserDefaults.standard.set(true, forKey: key)
+
+        // 键盘模式已移除，清掉遗留的键盘踏板组。
+        let cleanupKey = "cleanup.keyboardbank.v1"
+        if !UserDefaults.standard.bool(forKey: cleanupKey) {
+            let removedIDs = store.data.pedalBanks
+                .filter { $0.name == BankNames.keyboard }
+                .map(\.id)
+            if !removedIDs.isEmpty {
+                store.data.pedalBanks.removeAll { $0.name == BankNames.keyboard }
+                if let active = store.data.activeBankID, removedIDs.contains(active) {
+                    store.data.activeBankID = store.data.pedalBanks.first?.id
+                }
+            }
+            UserDefaults.standard.set(true, forKey: cleanupKey)
+        }
     }
 
     private func makeDevice(profile: DeviceProfile) -> AmpDevice {
