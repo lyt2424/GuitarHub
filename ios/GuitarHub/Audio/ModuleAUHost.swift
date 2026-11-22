@@ -94,12 +94,15 @@ final class ModuleAUHost: ObservableObject {
                 name = value as String
             }
 
-            var cfManufacturer: Unmanaged<CFString>?
-            var manufacturer = ""
-            if AudioComponentCopyManufacturer(current, &cfManufacturer) == noErr,
-               let value = cfManufacturer?.takeRetainedValue() {
-                manufacturer = value as String
-            }
+            // 制造商是四字符码（例如 'KORG'），没有现成的字符串 API。
+            let code = description.componentManufacturer
+            let makerBytes: [UInt8] = [
+                UInt8((code >> 24) & 0xFF),
+                UInt8((code >> 16) & 0xFF),
+                UInt8((code >> 8) & 0xFF),
+                UInt8(code & 0xFF)
+            ]
+            let manufacturer = String(bytes: makerBytes, encoding: .ascii) ?? ""
 
             results.append(ComponentInfo(name: name, manufacturer: manufacturer, description: description))
             component = AudioComponentFindNext(current, &search)
