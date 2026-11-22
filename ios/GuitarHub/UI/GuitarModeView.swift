@@ -150,10 +150,10 @@ private struct GuitarDeviceView: View {
                 HStack(spacing: 10) {
                     ForEach(0..<device.effectivePresetCount, id: \.self) { index in
                         let palette: [Color] = [
-                            Color(hex: "#3B82F6"),
-                            Color(hex: "#14B8A6"),
-                            Color(hex: "#A855F7"),
-                            Color(hex: "#F97316")
+                            Color(hex: "#3B82F6") ?? .blue,
+                            Color(hex: "#14B8A6") ?? .teal,
+                            Color(hex: "#A855F7") ?? .purple,
+                            Color(hex: "#F97316") ?? .orange
                         ]
                         let tint = palette[index % palette.count]
                         let selected = index == device.presetIndex
