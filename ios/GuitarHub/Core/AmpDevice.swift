@@ -157,8 +157,12 @@ final class AmpDevice: ObservableObject, Identifiable {
             codec.selectPreset(index)
             // 只保留最后一次读取：快速连踩时，旧请求的回包会把序号/模块带乱。
             presetReloadWork?.cancel()
+            presetSelectionCounter += 1
+            let counter = presetSelectionCounter
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
+                self.awaitingPresetCounter = counter
+                self.awaitingPresetResponse = true
                 if let spark = self.codec as? SparkCodec {
                     spark.requestPreset(index)
                 } else {
@@ -166,7 +170,6 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetReloadWork = work
-            awaitingPresetResponse = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
             store.setLastUsedPreset(index, for: profile.id)
             return
@@ -330,12 +333,16 @@ final class AmpDevice: ObservableObject, Identifiable {
         case .disconnected(let reason):
             if let reason { lastError = reason }
         case .stateLoaded(let snap):
-            // 连踩时旧请求的回包可能晚到：序号对不上就丢掉，避免把新切的音色覆盖回旧的。
-            if awaitingPresetResponse, snap.presetIndex != presetIndex {
-                log("忽略过期的音色状态（\(snap.presetIndex + 1)）")
-                return
+            // 连踩时旧请求的回包可能晚到：只要期间又切过档，就直接丢掉。
+            if awaitingPresetResponse {
+                let counter = awaitingPresetCounter ?? -1
+                if counter != presetSelectionCounter || snap.presetIndex != presetIndex {
+                    log("忽略过期的音色状态（\(snap.presetIndex + 1)）")
+                    return
+                }
             }
             awaitingPresetResponse = false
+            awaitingPresetCounter = nil
             presetIndex = snap.presetIndex
             presetName = store.alias(profile.id, index: snap.presetIndex)
                 ?? (profile.capabilities.stateReadback ? "预设 \(snap.presetIndex + 1)" : snap.name)
@@ -371,6 +378,8 @@ final class AmpDevice: ObservableObject, Identifiable {
     private var captureWork: DispatchWorkItem?
     private var presetReloadWork: DispatchWorkItem?
     private var awaitingPresetResponse = false
+    private var presetSelectionCounter = 0
+    private var awaitingPresetCounter: Int?
 
     /// 拖动参数时不要每一帧都写盘：合并到停止操作 0.6 秒后再存。
     private func scheduleCapture() {
