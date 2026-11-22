@@ -169,7 +169,10 @@ final class SparkCodec: DeviceCodec {
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
         // 优先用“我们请求的那个号”，避免回包里的旧 curr 把界面带偏。
         // 主动读取某档时，回包就是那档的内容；不要把回包里可能滞后的 curr 当成显示号。
-        let rawIndex = expectedPresetIndex ?? parsed.presetNumber
+        let rawIndex = expectedPresetIndex
+            ?? (parsed.currentPreset < profile.capabilities.presetCount
+                ? parsed.currentPreset
+                : parsed.presetNumber)
         if let expected = expectedPresetIndex {
             preset?.currentPreset = expected
         } else if parsed.currentPreset < profile.capabilities.presetCount {
