@@ -155,17 +155,18 @@ final class AmpDevice: ObservableObject, Identifiable {
 
         if profile.capabilities.stateReadback {
             codec.selectPreset(index)
-            // 给音箱一点时间完成切换，再读回状态，否则会读到旧音色。
-            for delay in [0.35, 1.0] {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self else { return }
-                    if let spark = self.codec as? SparkCodec {
-                        spark.requestPreset(index)
-                    } else {
-                        self.codec.requestState()
-                    }
+            // 只保留最后一次读取：快速连踩时，旧请求的回包会把序号/模块带乱。
+            presetReloadWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                if let spark = self.codec as? SparkCodec {
+                    spark.requestPreset(index)
+                } else {
+                    self.codec.requestState()
                 }
             }
+            presetReloadWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
             store.setLastUsedPreset(index, for: profile.id)
             return
         }
@@ -361,6 +362,7 @@ final class AmpDevice: ObservableObject, Identifiable {
     }
 
     private var captureWork: DispatchWorkItem?
+    private var presetReloadWork: DispatchWorkItem?
 
     /// 拖动参数时不要每一帧都写盘：合并到停止操作 0.6 秒后再存。
     private func scheduleCapture() {
