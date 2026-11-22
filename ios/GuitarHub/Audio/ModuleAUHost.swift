@@ -35,7 +35,12 @@ final class ModuleAUHost: ObservableObject {
         // 用底层 AudioComponent 枚举：AVAudioUnitComponentManager 在部分系统版本上
         // 不会返回第三方 AUv3，但 GarageBand 能看到的插件这里一定能看到。
         let components = enumerateAllComponents()
-        discoveredComponents = components.map { "\($0.name) · \($0.manufacturer)" }
+        discoveredComponents = components.map { item in
+            let type = Self.fourCC(item.description.componentType)
+            let sub = Self.fourCC(item.description.componentSubType)
+            let maker = Self.fourCC(item.description.componentManufacturer)
+            return "\(item.name) · \(maker) · \(type)/\(sub)"
+        }
 
         let candidates = components.filter { item in
             let name = item.name.lowercased()
@@ -66,6 +71,31 @@ final class ModuleAUHost: ObservableObject {
             }
             DispatchQueue.main.async { self.attach(unit) }
         }
+    }
+
+    static func fourCC(_ value: UInt32) -> String {
+        let bytes: [UInt8] = [
+            UInt8((value >> 24) & 0xFF),
+            UInt8((value >> 16) & 0xFF),
+            UInt8((value >> 8) & 0xFF),
+            UInt8(value & 0xFF)
+        ]
+        let text = String(bytes: bytes, encoding: .ascii) ?? "????"
+        return text.trimmingCharacters(in: .whitespaces)
+    }
+
+    var componentsDump: String {
+        discoveredComponents.joined(separator: "\n")
+    }
+
+    /// 导出到 App 的 Documents，便于用「文件」App 取走。
+    func exportComponents() -> URL? {
+        let fm = FileManager.default
+        guard let docs = try? fm.url(for: .documentDirectory, in: .userDomainMask,
+                                     appropriateFor: nil, create: true) else { return nil }
+        let url = docs.appendingPathComponent("au-components.txt")
+        try? componentsDump.write(to: url, atomically: true, encoding: .utf8)
+        return url
     }
 
     private struct ComponentInfo {

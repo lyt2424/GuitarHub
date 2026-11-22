@@ -30,10 +30,24 @@ struct ModuleHostView: View {
 
                             if !host.discoveredComponents.isEmpty {
                                 Divider()
-                                Text("系统里已发现的 AUv3 组件：")
+                                HStack(spacing: 10) {
+                                    Button("复制组件列表") {
+                                        UIPasteboard.general.string = host.componentsDump
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.bordered)
+
+                                    Button("导出文件") {
+                                        _ = host.exportComponents()
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.bordered)
+                                }
+
+                                Text("系统里已发现的 AUv3 组件（\(host.discoveredComponents.count) 个）：")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
-                                ForEach(host.discoveredComponents, id: \.self) { line in
+                                ForEach(Array(host.discoveredComponents.prefix(12).enumerated()), id: \.offset) { _, line in
                                     Text(line)
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.tertiary)
