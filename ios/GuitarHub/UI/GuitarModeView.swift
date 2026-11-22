@@ -84,15 +84,21 @@ private struct GuitarDeviceView: View {
     // Tap 计速
     @State private var tapTimes: [Date] = []
     @State private var tappedBPM: Double?
+    @State private var renameIndex: Int?
+    @State private var renamingPreset = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                presetCard
-                moduleGrid
-                drumPanel
-                globalPanel
-                parameterPanel
+                if device.profile.id == "spark-mini" {
+                    sparkSimpleCard
+                } else {
+                    presetCard
+                    moduleGrid
+                    drumPanel
+                    globalPanel
+                    parameterPanel
+                }
             }
             .padding(14)
         }
@@ -107,6 +113,105 @@ private struct GuitarDeviceView: View {
             Button("保存") { device.renameCurrentPreset(draftName) }
         } message: {
             Text("留空则恢复默认名称。")
+        }
+    }
+
+    // MARK: - Spark 精简页（只保留 4 个预设块 + 上/下一个）
+
+    private var sparkSimpleCard: some View {
+        Card {
+            VStack(spacing: 14) {
+                HStack {
+                    Text(device.status.label)
+                        .font(.caption)
+                        .foregroundStyle(device.status.isConnected ? Theme.onColor : .secondary)
+                    Spacer()
+                    Text("预设 \(device.presetIndex + 1) / \(device.effectivePresetCount)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                if !device.status.isConnected {
+                    Button {
+                        if device.isScanning { device.stopScan() } else { device.startScan() }
+                    } label: {
+                        Label(device.isScanning ? "搜索中…" : "搜索并连接 Spark Mini",
+                              systemImage: "dot.radiowaves.left.and.right")
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                }
+
+                // 4 个预设块，点哪个跳哪个
+                HStack(spacing: 10) {
+                    ForEach(0..<device.effectivePresetCount, id: \.self) { index in
+                        Button {
+                            device.selectPreset(index)
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text("\(index + 1)")
+                                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                                Text(device.displayName(at: index))
+                                    .font(.caption2.weight(.medium))
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.7)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(index == device.presetIndex ? Theme.accent : Theme.cardHigh)
+                            )
+                            .foregroundStyle(index == device.presetIndex ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("重命名") {
+                                renameIndex = index
+                                draftName = device.displayName(at: index)
+                                renamingPreset = true
+                            }
+                        }
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        device.stepPreset(-1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.title2.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        device.stepPreset(1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.title2.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .alert("预设名称", isPresented: $renamingPreset) {
+            TextField("中文名", text: $draftName)
+            Button("取消", role: .cancel) {}
+            Button("保存") {
+                if let index = renameIndex {
+                    device.renamePreset(draftName, at: index)
+                }
+            }
         }
     }
 
