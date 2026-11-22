@@ -32,33 +32,29 @@ final class ModuleAUHost: ObservableObject {
 
         // 列出系统里所有 AUv3 组件，便于诊断。
         // 注意：必须用 components(matching:)，直接写 .components 会和同名方法产生歧义。
-        // 全类型枚举：有些插件的注册类型不是 aumu，先全部列出来再筛。
-        let query = AudioComponentDescription(
-            componentType: 0,
-            componentSubType: 0,
-            componentManufacturer: 0,
-            componentFlags: 0,
-            componentFlagsMask: 0
-        )
-        let all = AVAudioUnitComponentManager.shared().components(matching: query)
-        discoveredComponents = all.map { "\($0.name) · \($0.manufacturerName)" }
+        // 用底层 AudioComponent 枚举：AVAudioUnitComponentManager 在部分系统版本上
+        // 不会返回第三方 AUv3，但 GarageBand 能看到的插件这里一定能看到。
+        let components = enumerateAllComponents()
+        discoveredComponents = components.map { "\($0.name) · \($0.manufacturer)" }
 
-        let candidates = all.filter { component in
-            let name = component.name.lowercased()
-            let maker = component.manufacturerName.lowercased()
-            let isInstrument = component.audioComponentDescription.componentType == kAudioUnitType_MusicDevice
+        let candidates = components.filter { item in
+            let name = item.name.lowercased()
+            let maker = item.manufacturer.lowercased()
+            let isInstrument = item.description.componentType == kAudioUnitType_MusicDevice
             return isInstrument && (name.contains("module") || maker.contains("korg"))
         }
 
         // 同时装了免费版和 Pro 时，优先选名字带 Pro 的。
-        guard let component = candidates.first(where: { $0.name.lowercased().contains("pro") })
+        guard let chosen = candidates.first(where: { $0.name.lowercased().contains("pro") })
                 ?? candidates.first else {
             status = "没有找到 KORG Module 插件。请确认装的是 Module Pro，并先打开它一次。"
             return
         }
+        let componentName = chosen.name
+        let componentDescription = chosen.description
 
-        status = "正在加载 \(component.name)…"
-        AVAudioUnit.instantiate(with: component.audioComponentDescription, options: []) { [weak self] unit, error in
+        status = "正在加载 \(componentName)…"
+        AVAudioUnit.instantiate(with: componentDescription, options: []) { [weak self] unit, error in
             guard let self else { return }
             if let error {
                 DispatchQueue.main.async { self.status = "加载失败：\(error.localizedDescription)" }
@@ -70,6 +66,45 @@ final class ModuleAUHost: ObservableObject {
             }
             DispatchQueue.main.async { self.attach(unit) }
         }
+    }
+
+    private struct ComponentInfo {
+        var name: String
+        var manufacturer: String
+        var description: AudioComponentDescription
+    }
+
+    private func enumerateAllComponents() -> [ComponentInfo] {
+        var results: [ComponentInfo] = []
+        var search = AudioComponentDescription(
+            componentType: 0,
+            componentSubType: 0,
+            componentManufacturer: 0,
+            componentFlags: 0,
+            componentFlagsMask: 0
+        )
+        var component = AudioComponentFindNext(nil, &search)
+        while let current = component {
+            var description = AudioComponentDescription()
+            AudioComponentGetDescription(current, &description)
+
+            var cfName: Unmanaged<CFString>?
+            var name = "?"
+            if AudioComponentCopyName(current, &cfName) == noErr, let value = cfName?.takeRetainedValue() {
+                name = value as String
+            }
+
+            var cfManufacturer: Unmanaged<CFString>?
+            var manufacturer = ""
+            if AudioComponentCopyManufacturer(current, &cfManufacturer) == noErr,
+               let value = cfManufacturer?.takeRetainedValue() {
+                manufacturer = value as String
+            }
+
+            results.append(ComponentInfo(name: name, manufacturer: manufacturer, description: description))
+            component = AudioComponentFindNext(current, &search)
+        }
+        return results
     }
 
     private func attach(_ unit: AVAudioUnit) {
