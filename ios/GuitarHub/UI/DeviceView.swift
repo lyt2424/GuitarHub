@@ -37,8 +37,11 @@ struct DeviceView: View {
             .background(Theme.background)
             .navigationTitle("设备")
         }
-        .onAppear { Diagnostics.trafficEnabled = true }
-        .onDisappear { Diagnostics.trafficEnabled = false }
+        .onAppear {
+            Diagnostics.trafficVisible = true
+            hub.devices.forEach { $0.publishTrafficHistory() }
+        }
+        .onDisappear { Diagnostics.trafficVisible = false }
     }
 }
 

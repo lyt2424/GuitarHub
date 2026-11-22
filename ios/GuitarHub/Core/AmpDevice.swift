@@ -4,8 +4,8 @@ import Combine
 
 /// 面向 UI 的单台设备状态容器：BLE 会话 + 协议编解码器 + 本地预设库。
 enum Diagnostics {
-    /// 设备调试页可见时才记录原始收发，避免演出界面被调试数据拖慢。
-    static var trafficEnabled = false
+    /// 原始收发始终记在内存里；只有调试页打开时才同步到界面，避免演出界面被拖慢。
+    static var trafficVisible = false
 }
 
 final class AmpDevice: ObservableObject, Identifiable {
@@ -368,12 +368,21 @@ final class AmpDevice: ObservableObject, Identifiable {
         if logLines.count > 300 { logLines.removeFirst(logLines.count - 300) }
     }
 
+    private var trafficBuffer: [String] = []
+
     private func recordTraffic(direction: String, data: Data) {
-        // 只在设备调试页打开时记录，避免滑杆拖动时每包都触发界面刷新。
-        guard Diagnostics.trafficEnabled else { return }
         let hex = data.map { String(format: "%02X", $0) }.joined(separator: " ")
-        traffic.append("\(direction) \(hex)")
-        if traffic.count > 200 { traffic.removeFirst(traffic.count - 200) }
+        trafficBuffer.append("\(direction) \(hex)")
+        if trafficBuffer.count > 300 { trafficBuffer.removeFirst(trafficBuffer.count - 300) }
+        // 只有调试页可见时才推送到界面。
+        if Diagnostics.trafficVisible {
+            traffic = trafficBuffer
+        }
+    }
+
+    /// 打开调试页时，把之前缓存的收发记录一次性显示出来。
+    func publishTrafficHistory() {
+        traffic = trafficBuffer
     }
 
     private static let timeFormatter: DateFormatter = {
