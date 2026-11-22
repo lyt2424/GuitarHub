@@ -281,8 +281,8 @@ final class SparkCodec: DeviceCodec {
         // Spark 的切档命令第一个字节固定为 0，不是“当前预设号”。
         // 传当前号会让音箱直接忽略命令（从第 1 档以外开始尤其明显）。
         send(cmd: 0x01, sub: 0x38, payload: [0x00, UInt8(target & 0xFF)])
+        if pendingAppSwitch != target { appSwitchRetryCount = 0 }
         pendingAppSwitch = target
-        appSwitchRetryCount = 0
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {
