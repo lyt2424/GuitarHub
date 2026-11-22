@@ -18,6 +18,9 @@ enum SparkProtocol {
     /// 单块最多 32 字节（4 组 × 8），扣除 4 个掩码和 3 字节分块头 = 25 字节数据。
     static let maxChunkData = 25
 
+    /// Spark 40 使用的 16 字节块头（01 FE + 14 个 0）。
+    static let blockHeader: [UInt8] = [0x01, 0xFE] + [UInt8](repeating: 0, count: 14)
+
     // MARK: - 编码（App → 音箱）
 
     /// 把一条逻辑消息（不含 6 字节头）打包成一个分块。

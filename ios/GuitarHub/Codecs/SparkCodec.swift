@@ -23,6 +23,8 @@ final class SparkCodec: DeviceCodec {
     private var sequence: UInt8 = 0
     private var preset: SparkPreset?
     private var pendingParams: [String: Double] = [:]
+    private var receivedAny = false
+    private var usedBlockHeader = false
 
     init(profile: DeviceProfile, session: BLESession) {
         self.profile = profile
@@ -39,6 +41,14 @@ final class SparkCodec: DeviceCodec {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.requestState()
         }
+        // Spark 40 需要 16 字节块头，Mini/GO 可能不需要。
+        // 先不带块头；1.2 秒内没有任何回包就带块头重试一次。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, !self.receivedAny else { return }
+            self.usedBlockHeader = true
+            self.eventHandler?(.log("没有收到回包，改用带块头再试一次"))
+            self.requestState(blockHeader: true)
+        }
     }
 
     func didDisconnect() {
@@ -49,6 +59,7 @@ final class SparkCodec: DeviceCodec {
 
     func didReceive(_ data: Data) {
         let messages = decoder.feed([UInt8](data))
+        if !messages.isEmpty { receivedAny = true }
         for message in messages {
             handle(message)
         }
@@ -172,11 +183,11 @@ final class SparkCodec: DeviceCodec {
 
     // MARK: - 发送
 
-    func requestState() {
+    func requestState(blockHeader: Bool = false) {
         // 0x0201 + 0x0100 + 30 个 0 → 音箱回传当前音色
         var payload: [UInt8] = [0x01, 0x00]
         payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
-        send(cmd: 0x02, sub: 0x01, payload: payload)
+        send(cmd: 0x02, sub: 0x01, payload: payload, blockHeader: blockHeader)
     }
 
     func requestName() {
@@ -229,11 +240,15 @@ final class SparkCodec: DeviceCodec {
         send(cmd: 0x01, sub: 0x63, payload: [])
     }
 
-    private func send(cmd: UInt8, sub: UInt8, payload: [UInt8]) {
+    private func send(cmd: UInt8, sub: UInt8, payload: [UInt8], blockHeader: Bool = false) {
         sequence = sequence &+ 1
-        let frame = SparkProtocol.frame(cmd: cmd, sub: sub, payload: payload, sequence: sequence)
+        var frame = SparkProtocol.frame(cmd: cmd, sub: sub, payload: payload, sequence: sequence)
+        if blockHeader {
+            frame = SparkProtocol.blockHeader + frame
+        }
         let chunkSize = profile.transport.chunkSize > 0 ? profile.transport.chunkSize : 20
-        let interval = Double(max(2, profile.transport.chunkIntervalMs)) / 1000.0
+        // Spark 对写入节奏比较敏感，12ms 比 8ms 稳。
+        let interval = max(0.012, Double(profile.transport.chunkIntervalMs) / 1000.0)
         session?.sendChunked(Data(frame), chunkSize: chunkSize, interval: interval)
         let hex = frame.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
         eventHandler?(.log("→ \(String(format: "%02X%02X", cmd, sub)) \(hex)\(frame.count > 24 ? " …" : "")"))
