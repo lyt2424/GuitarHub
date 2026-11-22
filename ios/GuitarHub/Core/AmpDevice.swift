@@ -150,6 +150,15 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     func selectPreset(_ index: Int) {
         guard index >= 0 else { return }
+
+        // 上一档还没确认回来：先记下最后一次目标，等确认后再执行，避免命令被音箱丢掉。
+        if awaitingPresetResponse {
+            queuedPresetIndex = index
+            presetIndex = index
+            presetName = displayName(at: index)
+            return
+        }
+
         presetIndex = index
         lastError = nil
 
@@ -170,7 +179,22 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetReloadWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+
+            // 1.5 秒还没等到状态，就当作切换完成，继续处理排队的目标。
+            presetTimeoutWork?.cancel()
+            let timeout = DispatchWorkItem { [weak self] in
+                guard let self, self.awaitingPresetResponse else { return }
+                self.awaitingPresetResponse = false
+                self.awaitingPresetCounter = nil
+                if let next = self.queuedPresetIndex {
+                    self.queuedPresetIndex = nil
+                    self.selectPreset(next)
+                }
+            }
+            presetTimeoutWork = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: timeout)
+
             store.setLastUsedPreset(index, for: profile.id)
             return
         }
@@ -343,12 +367,18 @@ final class AmpDevice: ObservableObject, Identifiable {
             }
             awaitingPresetResponse = false
             awaitingPresetCounter = nil
+            presetTimeoutWork?.cancel()
             presetIndex = snap.presetIndex
             presetName = store.alias(profile.id, index: snap.presetIndex)
                 ?? (profile.capabilities.stateReadback ? "预设 \(snap.presetIndex + 1)" : snap.name)
             modules = Self.merge(snapshot: snap.modules, profile: profile)
             scheduleCapture()
             log("已读取音色：\(snap.name)")
+
+            if let next = queuedPresetIndex {
+                queuedPresetIndex = nil
+                DispatchQueue.main.async { [weak self] in self?.selectPreset(next) }
+            }
         case .presetName(let name):
             guard !profile.capabilities.stateReadback else { return }
             presetName = store.alias(profile.id, index: presetIndex) ?? name
@@ -377,6 +407,8 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     private var captureWork: DispatchWorkItem?
     private var presetReloadWork: DispatchWorkItem?
+    private var presetTimeoutWork: DispatchWorkItem?
+    private var queuedPresetIndex: Int?
     private var awaitingPresetResponse = false
     private var presetSelectionCounter = 0
     private var awaitingPresetCounter: Int?
