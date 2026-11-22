@@ -159,6 +159,15 @@ final class DeviceHub: ObservableObject {
         }
         UserDefaults.standard.set(true, forKey: key)
 
+        // Spark 旧的默认映射把 A/B 绑成了混响/延迟，一次性换成切音色。
+        let sparkKey = "migration.banks.spark.v3"
+        if !UserDefaults.standard.bool(forKey: sparkKey) {
+            if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Spark Mini" }) {
+                store.data.pedalBanks[index] = PedalBank.sparkStarter()
+            }
+            UserDefaults.standard.set(true, forKey: sparkKey)
+        }
+
         // 键盘模式已移除，清掉遗留的键盘踏板组。
         let cleanupKey = "cleanup.keyboardbank.v1"
         if !UserDefaults.standard.bool(forKey: cleanupKey) {

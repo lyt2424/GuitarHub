@@ -127,7 +127,16 @@ struct PedalBank: Codable, Identifiable, Hashable {
 
     /// 三套默认踏板组，名字与设备配置名 / 键盘模式对应，切换入口时自动选中。
     static func sparkStarter() -> PedalBank {
-        ampStarter(device: "spark-mini", name: "Spark Mini")
+        PedalBank(
+            name: "Spark Mini",
+            mappings: [
+                // A 上一个音色 / B 下一个音色 / C 延迟 / D 混响
+                PedalMapping(trigger: .cc(number: 20), action: .ampPresetStep(device: "spark-mini", delta: -1)),
+                PedalMapping(trigger: .cc(number: 21), action: .ampPresetStep(device: "spark-mini", delta: 1)),
+                PedalMapping(trigger: .cc(number: 22), action: .ampModule(device: "spark-mini", module: "delay")),
+                PedalMapping(trigger: .cc(number: 23), action: .ampModule(device: "spark-mini", module: "reverb"))
+            ]
+        )
     }
 
     static func pulzeStarter() -> PedalBank {
