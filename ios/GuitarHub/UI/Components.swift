@@ -1,9 +1,15 @@
 import SwiftUI
 
 enum Theme {
-    static let background = Color(red: 0.06, green: 0.06, blue: 0.07)
-    static let card = Color(red: 0.12, green: 0.12, blue: 0.14)
-    static let cardHigh = Color(red: 0.20, green: 0.20, blue: 0.22)
+    static let background = Color(red: 0.12, green: 0.13, blue: 0.16)
+    static let card = Color(red: 0.17, green: 0.18, blue: 0.22)
+    static let cardHigh = Color(red: 0.26, green: 0.28, blue: 0.34)
+    static let page = LinearGradient(
+        colors: [Color(red: 0.16, green: 0.18, blue: 0.23),
+                 Color(red: 0.10, green: 0.11, blue: 0.14)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
     static let accent = Color(red: 1.0, green: 0.45, blue: 0.12)
     static let accentSoft = Color(red: 1.0, green: 0.45, blue: 0.12).opacity(0.18)
     static let onColor = Color(red: 0.35, green: 0.85, blue: 0.55)

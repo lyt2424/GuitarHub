@@ -102,6 +102,7 @@ private struct GuitarDeviceView: View {
             }
             .padding(14)
         }
+        .background(Theme.page.ignoresSafeArea())
         .sheet(isPresented: $showPresets) {
             PresetListSheet(device: device) { index in
                 device.selectPreset(index)
@@ -148,6 +149,14 @@ private struct GuitarDeviceView: View {
                 // 4 个预设块，点哪个跳哪个
                 HStack(spacing: 10) {
                     ForEach(0..<device.effectivePresetCount, id: \.self) { index in
+                        let palette: [Color] = [
+                            Color(hex: "#3B82F6"),
+                            Color(hex: "#14B8A6"),
+                            Color(hex: "#A855F7"),
+                            Color(hex: "#F97316")
+                        ]
+                        let tint = palette[index % palette.count]
+                        let selected = index == device.presetIndex
                         Button {
                             device.selectPreset(index)
                         } label: {
@@ -164,9 +173,14 @@ private struct GuitarDeviceView: View {
                             .frame(height: 96)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(index == device.presetIndex ? Theme.accent : Theme.cardHigh)
+                                    .fill(selected ? tint : tint.opacity(0.28))
                             )
-                            .foregroundStyle(index == device.presetIndex ? .white : .primary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.white.opacity(selected ? 0.9 : 0.15),
+                                            lineWidth: selected ? 3 : 1)
+                            )
+                            .foregroundStyle(.white)
                         }
                         .buttonStyle(.plain)
                         .contextMenu {

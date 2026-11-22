@@ -93,11 +93,9 @@ struct PedalBank: Codable, Identifiable, Hashable {
         PedalBank(
             name: "Spark Mini",
             mappings: [
-                // A 上一个音色 / B 下一个音色 / C 延迟 / D 混响
+                // A 上一个音色 / B 下一个音色
                 PedalMapping(trigger: .cc(number: 20), action: .ampPresetStep(device: "spark-mini", delta: -1)),
-                PedalMapping(trigger: .cc(number: 21), action: .ampPresetStep(device: "spark-mini", delta: 1)),
-                PedalMapping(trigger: .cc(number: 22), action: .ampModule(device: "spark-mini", module: "delay")),
-                PedalMapping(trigger: .cc(number: 23), action: .ampModule(device: "spark-mini", module: "reverb"))
+                PedalMapping(trigger: .cc(number: 21), action: .ampPresetStep(device: "spark-mini", delta: 1))
             ]
         )
     }
