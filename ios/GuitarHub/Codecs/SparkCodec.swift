@@ -247,11 +247,9 @@ final class SparkCodec: DeviceCodec {
     func selectPreset(_ index: Int) {
         let maxIndex = max(0, profile.capabilities.presetCount - 1)
         let target = min(max(0, index), maxIndex)
-        let current = preset?.currentPreset ?? 0
-        send(cmd: 0x01, sub: 0x38, payload: [UInt8(current & 0xFF), UInt8(target & 0xFF)])
-        // 不要本地抢先改 current：音箱可能丢掉这条命令，
-        // 一旦本地和音箱不一致，后续切换都会带着错误的“当前档”被忽略。
-        // current 只以音箱回报的 curr / 0338 为准。
+        // Spark 的切档命令第一个字节固定为 0，不是“当前预设号”。
+        // 传当前号会让音箱直接忽略命令（从第 1 档以外开始尤其明显）。
+        send(cmd: 0x01, sub: 0x38, payload: [0x00, UInt8(target & 0xFF)])
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {
