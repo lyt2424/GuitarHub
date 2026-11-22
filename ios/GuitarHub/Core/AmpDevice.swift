@@ -180,15 +180,26 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetReloadWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
 
-            // 1.5 秒还没等到状态，就当作切换完成，继续处理排队的目标。
+            // 音箱切换需要时间，0.5 秒这次可能被忽略；1.3 秒再读一次。
+            let retry = DispatchWorkItem { [weak self] in
+                guard let self, self.awaitingPresetResponse else { return }
+                if let spark = self.codec as? SparkCodec {
+                    spark.requestPreset(index)
+                } else {
+                    self.codec.requestState()
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3, execute: retry)
+
+            // 2.2 秒仍未回状态：解除等待，读一次当前状态兜底。
             presetTimeoutWork?.cancel()
             let timeout = DispatchWorkItem { [weak self] in
                 guard let self, self.awaitingPresetResponse else { return }
                 self.awaitingPresetResponse = false
                 self.awaitingPresetCounter = nil
-                // 不再主动补发/重读，避免和硬件旋钮抢控制权。
+                self.codec.requestState()
                 if let next = self.queuedPresetIndex {
                     self.queuedPresetIndex = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -197,7 +208,7 @@ final class AmpDevice: ObservableObject, Identifiable {
                 }
             }
             presetTimeoutWork = timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: timeout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2, execute: timeout)
 
             store.setLastUsedPreset(index, for: profile.id)
             return
