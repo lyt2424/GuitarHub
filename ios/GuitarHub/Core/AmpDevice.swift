@@ -430,9 +430,9 @@ final class AmpDevice: ObservableObject, Identifiable {
     private func startStateSync() {
         guard profile.capabilities.stateReadback else { return }
         syncTimer?.invalidate()
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             guard let self, self.status.isConnected, !self.awaitingPresetResponse else { return }
-            guard Date().timeIntervalSince(self.lastInteraction) > 2.0 else { return }
+            guard Date().timeIntervalSince(self.lastInteraction) > 1.0 else { return }
             self.codec.requestState()
         }
     }
