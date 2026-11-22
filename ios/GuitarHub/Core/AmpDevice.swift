@@ -329,6 +329,10 @@ final class AmpDevice: ObservableObject, Identifiable {
             scheduleCapture()
         case .presetIndex(let index):
             presetIndex = index
+            // 切档后立刻用自定义中文名，不等音色状态回传。
+            presetName = store.alias(profile.id, index: index)
+                ?? store.snapshot(profile.id, index: index)?.name
+                ?? "音色 \(index + 1)"
             store.setLastUsedPreset(index, for: profile.id)
         case .moduleChanged(let module, let enabled):
             setLocalModule(module, enabled: enabled)

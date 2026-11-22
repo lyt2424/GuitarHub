@@ -539,36 +539,38 @@ struct PresetListSheet: View {
         NavigationStack {
             List {
                 ForEach(0..<device.effectivePresetCount, id: \.self) { index in
-                    Button {
-                        onSelect(index)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Text("\(index + 1)")
-                                .font(.caption.monospacedDigit())
-                                .frame(width: 34, alignment: .leading)
-                                .foregroundStyle(index == device.presetIndex ? Theme.accent : .secondary)
-
-                            Text(device.displayName(at: index))
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-
-                            Spacer()
-
-                            if index == device.presetIndex {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(Theme.accent)
+                    HStack(spacing: 10) {
+                        Button {
+                            onSelect(index)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("\(index + 1)")
+                                    .font(.caption.monospacedDigit())
+                                    .frame(width: 28, alignment: .leading)
+                                    .foregroundStyle(index == device.presetIndex ? Theme.accent : .secondary)
+                                if index == device.presetIndex {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(Theme.accent)
+                                }
                             }
                         }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions {
-                        Button("改名") {
-                            draft = device.displayName(at: index)
-                            renamingIndex = index
+                        .buttonStyle(.plain)
+
+                        TextField("音色 \(index + 1)", text: Binding(
+                            get: { device.displayName(at: index) },
+                            set: { device.renamePreset($0, at: index) }
+                        ))
+                        .textFieldStyle(.plain)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+
+                        Button("切到") {
+                            onSelect(index)
+                            dismiss()
                         }
-                        .tint(Theme.accent)
+                        .font(.caption)
+                        .buttonStyle(.bordered)
                     }
                 }
             }
