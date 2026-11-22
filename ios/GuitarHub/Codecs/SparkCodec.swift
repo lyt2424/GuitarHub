@@ -84,14 +84,7 @@ final class SparkCodec: DeviceCodec {
                 eventHandler?(.presetName(name))
             }
 
-        case 0x0310, 0x0110:
-            var reader = SparkPayloadReader(message.payload)
-            let high = reader.byte() ?? 0
-            let low = reader.byte() ?? 0
-            let index = Int(high) << 8 | Int(low)
-            if index < 8 {
-                eventHandler?(.presetIndex(index))
-            }
+        // Spark MINI 的 0x0310 回报恒为 0，不能拿来当当前预设号，交给 0x0301 的 curr 字段。
 
         case 0x0115, 0x0315:
             handleOnOff(message.payload)
@@ -105,6 +98,10 @@ final class SparkCodec: DeviceCodec {
             preset?.presetNumber = Int(message.payload[1])
             eventHandler?(.presetIndex(Int(message.payload[1])))
             eventHandler?(.log("音箱切到预设 \(Int(message.payload[1]) + 1)"))
+            // 切档后主动重读一次，确保模块开关和参数跟新预设一致。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                self?.requestState()
+            }
 
         case 0x0363:
             var reader = SparkPayloadReader(message.payload)
@@ -154,7 +151,9 @@ final class SparkCodec: DeviceCodec {
     private func apply(_ parsed: SparkPreset) {
         preset = parsed
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
-        let index = parsed.presetNumber < 8 ? parsed.presetNumber : parsed.currentPreset
+        // 音箱的 curr 才是当前硬件预设，num 只是音色内部编号。
+        _ = parsed.presetNumber
+        let index = parsed.currentPreset < 8 ? parsed.currentPreset : parsed.presetNumber
         var modules: [ModuleState] = []
 
         for spec in profile.modules {

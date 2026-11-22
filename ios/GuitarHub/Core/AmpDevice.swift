@@ -156,8 +156,10 @@ final class AmpDevice: ObservableObject, Identifiable {
         if profile.capabilities.stateReadback {
             codec.selectPreset(index)
             // 给音箱一点时间完成切换，再读回状态，否则会读到旧音色。
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                self?.codec.requestState()
+            for delay in [0.35, 1.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.codec.requestState()
+                }
             }
             store.setLastUsedPreset(index, for: profile.id)
             return
@@ -216,9 +218,11 @@ final class AmpDevice: ObservableObject, Identifiable {
     }
 
     func displayName(at index: Int) -> String {
-        store.alias(profile.id, index: index)
-            ?? store.snapshot(profile.id, index: index)?.name
-            ?? "音色 \(index + 1)"
+        if let alias = store.alias(profile.id, index: index) { return alias }
+        // Spark 这类能读回状态的设备，名字只认用户为槽位设置的中文名，
+        // 不拿音箱里的音色名，避免 4 个槽位串成同一个名字。
+        if profile.capabilities.stateReadback { return "预设 \(index + 1)" }
+        return store.snapshot(profile.id, index: index)?.name ?? "音色 \(index + 1)"
     }
 
     // MARK: - 模块与参数
