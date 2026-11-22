@@ -27,6 +27,8 @@ final class SparkCodec: DeviceCodec {
     private var usedBlockHeader = false
     private var pendingParamValues: [String: Double] = [:]
     private var pendingParamWork: [String: DispatchWorkItem] = [:]
+    /// 主动读取某个预设时记下目标号；回包里的 curr 可能是旧值，不能拿来当显示号。
+    private var expectedPresetIndex: Int?
 
     init(profile: DeviceProfile, session: BLESession) {
         self.profile = profile
@@ -151,9 +153,13 @@ final class SparkCodec: DeviceCodec {
     private func apply(_ parsed: SparkPreset) {
         preset = parsed
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
-        // 音箱的 curr 才是当前硬件预设，num 只是音色内部编号。
-        _ = parsed.presetNumber
-        let index = parsed.currentPreset < 8 ? parsed.currentPreset : parsed.presetNumber
+        // 优先用“我们请求的那个号”，避免回包里的旧 curr 把界面带偏。
+        let rawIndex = expectedPresetIndex
+            ?? (parsed.currentPreset < profile.capabilities.presetCount
+                ? parsed.currentPreset
+                : parsed.presetNumber)
+        expectedPresetIndex = nil
+        let index = min(max(0, rawIndex), max(0, profile.capabilities.presetCount - 1))
         var modules: [ModuleState] = []
 
         for spec in profile.modules {
@@ -196,9 +202,11 @@ final class SparkCodec: DeviceCodec {
 
     /// 读取指定硬件预设的完整状态（切档后用它，不能只读“当前状态”）。
     func requestPreset(_ index: Int) {
-        var payload: [UInt8] = [0x00, UInt8(clamping: index)]
+        let target = min(max(0, index), max(0, profile.capabilities.presetCount - 1))
+        expectedPresetIndex = target
+        var payload: [UInt8] = [0x00, UInt8(clamping: target)]
         payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
-        eventHandler?(.log("读取预设 \(index + 1) 的状态"))
+        eventHandler?(.log("读取预设 \(target + 1) 的状态"))
         send(cmd: 0x02, sub: 0x01, payload: payload)
     }
 
