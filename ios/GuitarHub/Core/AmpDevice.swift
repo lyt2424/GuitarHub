@@ -3,6 +3,11 @@ import CoreBluetooth
 import Combine
 
 /// 面向 UI 的单台设备状态容器：BLE 会话 + 协议编解码器 + 本地预设库。
+enum Diagnostics {
+    /// 设备调试页可见时才记录原始收发，避免演出界面被调试数据拖慢。
+    static var trafficEnabled = false
+}
+
 final class AmpDevice: ObservableObject, Identifiable {
 
     let profile: DeviceProfile
@@ -135,6 +140,10 @@ final class AmpDevice: ObservableObject, Identifiable {
     // MARK: - 音色
 
     var effectivePresetCount: Int {
+        // 能读回状态的设备（Spark）以设备真实预设数为准，避免切到不存在的档位。
+        if profile.capabilities.stateReadback {
+            return max(1, profile.capabilities.presetCount)
+        }
         let maxStored = (store.library(profile.id).snapshots.keys.max() ?? 0) + 1
         return max(profile.capabilities.presetCount, maxStored)
     }
@@ -176,7 +185,7 @@ final class AmpDevice: ObservableObject, Identifiable {
             pushAll()
         }
         store.setLastUsedPreset(index, for: profile.id)
-        capture()
+        scheduleCapture()
         log("召回音色 \(index + 1)：\(presetName)")
     }
 
@@ -195,7 +204,7 @@ final class AmpDevice: ObservableObject, Identifiable {
         } else {
             presetName = trimmed
         }
-        capture()
+        scheduleCapture()
     }
 
     /// 给音色表里的任意一项改名（不需要先切过去）。
@@ -230,7 +239,7 @@ final class AmpDevice: ObservableObject, Identifiable {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
         modules[index].enabled = enabled
         codec.setModule(id, enabled: enabled)
-        capture()
+        scheduleCapture()
     }
 
     func value(_ module: ModuleID, _ param: Int) -> Double {
@@ -248,7 +257,7 @@ final class AmpDevice: ObservableObject, Identifiable {
             // 全局参数记在本机，重启 App 后保持。
             UserDefaults.standard.set(clamped, forKey: Self.globalKey(profile.id, module, param))
         }
-        capture()
+        scheduleCapture()
     }
 
     private static func globalKey(_ profileID: DeviceProfileID, _ module: ModuleID, _ param: Int) -> String {
@@ -313,26 +322,37 @@ final class AmpDevice: ObservableObject, Identifiable {
             presetIndex = snap.presetIndex
             presetName = store.alias(profile.id, index: snap.presetIndex) ?? snap.name
             modules = Self.merge(snapshot: snap.modules, profile: profile)
-            capture()
+            scheduleCapture()
             log("已读取音色：\(snap.name)")
         case .presetName(let name):
             presetName = store.alias(profile.id, index: presetIndex) ?? name
-            capture()
+            scheduleCapture()
         case .presetIndex(let index):
             presetIndex = index
             store.setLastUsedPreset(index, for: profile.id)
         case .moduleChanged(let module, let enabled):
             setLocalModule(module, enabled: enabled)
-            capture()
+            scheduleCapture()
         case .paramChanged(let module, let param, let value):
             setLocalParam(module, param, value)
-            capture()
+            scheduleCapture()
         case .log(let message):
             log(message)
         case .error(let message):
             lastError = message
             log("错误：\(message)")
         }
+    }
+
+    private var captureWork: DispatchWorkItem?
+
+    /// 拖动参数时不要每一帧都写盘：合并到停止操作 0.6 秒后再存。
+    private func scheduleCapture() {
+        guard store.data.settings.autoCapture else { return }
+        captureWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.capture() }
+        captureWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
 
     private func capture() {
@@ -349,6 +369,8 @@ final class AmpDevice: ObservableObject, Identifiable {
     }
 
     private func recordTraffic(direction: String, data: Data) {
+        // 只在设备调试页打开时记录，避免滑杆拖动时每包都触发界面刷新。
+        guard Diagnostics.trafficEnabled else { return }
         let hex = data.map { String(format: "%02X", $0) }.joined(separator: " ")
         traffic.append("\(direction) \(hex)")
         if traffic.count > 200 { traffic.removeFirst(traffic.count - 200) }

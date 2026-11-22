@@ -37,6 +37,8 @@ struct DeviceView: View {
             .background(Theme.background)
             .navigationTitle("设备")
         }
+        .onAppear { Diagnostics.trafficEnabled = true }
+        .onDisappear { Diagnostics.trafficEnabled = false }
     }
 }
 

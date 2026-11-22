@@ -25,6 +25,8 @@ final class SparkCodec: DeviceCodec {
     private var pendingParams: [String: Double] = [:]
     private var receivedAny = false
     private var usedBlockHeader = false
+    private var pendingParamValues: [String: Double] = [:]
+    private var pendingParamWork: [String: DispatchWorkItem] = [:]
 
     init(profile: DeviceProfile, session: BLESession) {
         self.profile = profile
@@ -99,6 +101,8 @@ final class SparkCodec: DeviceCodec {
 
         case 0x0138, 0x0338:
             guard message.payload.count >= 2 else { return }
+            preset?.currentPreset = Int(message.payload[1])
+            preset?.presetNumber = Int(message.payload[1])
             eventHandler?(.presetIndex(Int(message.payload[1])))
             eventHandler?(.log("音箱切到预设 \(Int(message.payload[1]) + 1)"))
 
@@ -207,8 +211,13 @@ final class SparkCodec: DeviceCodec {
     }
 
     func selectPreset(_ index: Int) {
+        let maxIndex = max(0, profile.capabilities.presetCount - 1)
+        let target = min(max(0, index), maxIndex)
         let current = preset?.currentPreset ?? 0
-        send(cmd: 0x01, sub: 0x38, payload: [UInt8(current & 0xFF), UInt8(index & 0xFF)])
+        send(cmd: 0x01, sub: 0x38, payload: [UInt8(current & 0xFF), UInt8(target & 0xFF)])
+        // 音箱以“当前号 + 目标号”判断切换，本地必须同步，否则下一次会被忽略。
+        preset?.currentPreset = target
+        preset?.presetNumber = target
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {
@@ -223,6 +232,19 @@ final class SparkCodec: DeviceCodec {
     }
 
     func setParameter(_ module: ModuleID, param: Int, value: Double) {
+        // 拖动滑杆时每帧都发会把 BLE 队列打满，这里按 50ms 合并，只发最后一次的值。
+        let key = "\(module)-\(param)"
+        pendingParamValues[key] = value
+        pendingParamWork[key]?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let latest = self.pendingParamValues.removeValue(forKey: key) else { return }
+            self.sendParameterNow(module, param: param, value: latest)
+        }
+        pendingParamWork[key] = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+    }
+
+    private func sendParameterNow(_ module: ModuleID, param: Int, value: Double) {
         guard let spec = profile.parameter(module: module, param: param),
               spec.mapping.kind == .sparkParam,
               let pedalIndex = spec.mapping.slot,
@@ -250,8 +272,11 @@ final class SparkCodec: DeviceCodec {
         // Spark 对写入节奏比较敏感，12ms 比 8ms 稳。
         let interval = max(0.012, Double(profile.transport.chunkIntervalMs) / 1000.0)
         session?.sendChunked(Data(frame), chunkSize: chunkSize, interval: interval)
-        let hex = frame.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
-        eventHandler?(.log("→ \(String(format: "%02X%02X", cmd, sub)) \(hex)\(frame.count > 24 ? " …" : "")"))
+        // 参数命令每秒会发很多条，不逐条写日志，否则 UI 会跟着卡。
+        if !(cmd == 0x01 && sub == 0x04) {
+            let hex = frame.prefix(24).map { String(format: "%02X", $0) }.joined(separator: " ")
+            eventHandler?(.log("→ \(String(format: "%02X%02X", cmd, sub)) \(hex)\(frame.count > 24 ? " …" : "")"))
+        }
     }
 
     // MARK: - 辅助
