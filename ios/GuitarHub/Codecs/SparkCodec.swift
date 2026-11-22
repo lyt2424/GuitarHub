@@ -209,6 +209,8 @@ final class SparkCodec: DeviceCodec {
     // MARK: - 发送
 
     func requestState(blockHeader: Bool = false) {
+        // 读“当前状态”时不要带目标预设号，回包里的 curr 才是真实档位。
+        expectedPresetIndex = nil
         // 0x0201 + 0x0100 + 30 个 0 → 音箱回传当前音色
         var payload: [UInt8] = [0x01, 0x00]
         payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
