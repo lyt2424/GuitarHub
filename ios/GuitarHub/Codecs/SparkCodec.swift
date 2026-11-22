@@ -30,6 +30,9 @@ final class SparkCodec: DeviceCodec {
     /// 主动读取某个预设时记下目标号；回包里的 curr 可能是旧值，不能拿来当显示号。
     private var expectedPresetIndex: Int?
     private var presetRetryCount = 0
+    /// App 主动切档的目标；只对 App 发起的切档做失败补发，硬件旋钮不碰。
+    private var pendingAppSwitch: Int?
+    private var appSwitchRetryCount = 0
 
     init(profile: DeviceProfile, session: BLESession) {
         self.profile = profile
@@ -110,6 +113,7 @@ final class SparkCodec: DeviceCodec {
         case 0x0338:
             // 音箱硬件旋钮主动上报：载荷是 [旧档, 新档]，第二个字节才是新档。
             guard message.payload.count >= 2 else { return }
+            pendingAppSwitch = nil
             let index = Int(message.payload[1])
             preset?.currentPreset = index
             preset?.presetNumber = index
@@ -182,6 +186,23 @@ final class SparkCodec: DeviceCodec {
             preset?.currentPreset = expected
         } else if parsed.currentPreset < profile.capabilities.presetCount {
             preset?.currentPreset = parsed.currentPreset
+        }
+
+        // App 发起的切档：回报的当前档不是目标，说明命令被丢了，补发一次。
+        if let pending = pendingAppSwitch, pending != parsed.currentPreset {
+            eventHandler?(.log("App 切档未生效：目标 \(pending + 1)，实际 \(parsed.currentPreset + 1)"))
+            if appSwitchRetryCount < 1 {
+                appSwitchRetryCount += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                    self?.selectPreset(pending)
+                }
+            }
+            expectedPresetIndex = nil
+            return
+        }
+        if pendingAppSwitch == parsed.currentPreset {
+            pendingAppSwitch = nil
+            appSwitchRetryCount = 0
         }
         expectedPresetIndex = nil
         let index = min(max(0, rawIndex), max(0, profile.capabilities.presetCount - 1))
@@ -260,6 +281,8 @@ final class SparkCodec: DeviceCodec {
         // Spark 的切档命令第一个字节固定为 0，不是“当前预设号”。
         // 传当前号会让音箱直接忽略命令（从第 1 档以外开始尤其明显）。
         send(cmd: 0x01, sub: 0x38, payload: [0x00, UInt8(target & 0xFF)])
+        pendingAppSwitch = target
+        appSwitchRetryCount = 0
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {

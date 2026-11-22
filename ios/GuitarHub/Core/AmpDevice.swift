@@ -150,6 +150,7 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     func selectPreset(_ index: Int, source: String = "界面") {
         guard index >= 0 else { return }
+        lastInteraction = Date()
         log("切档请求[\(source)] → \(index + 1)")
 
         // 上一档还没确认回来：先记下最后一次目标，等确认后再执行，避免命令被音箱丢掉。
@@ -290,6 +291,7 @@ final class AmpDevice: ObservableObject, Identifiable {
 
     func setModule(_ id: ModuleID, enabled: Bool) {
         guard let index = modules.firstIndex(where: { $0.id == id }) else { return }
+        lastInteraction = Date()
         modules[index].enabled = enabled
         codec.setModule(id, enabled: enabled)
         scheduleCapture()
@@ -303,6 +305,7 @@ final class AmpDevice: ObservableObject, Identifiable {
     func setParameter(_ module: ModuleID, param: Int, value: Double) {
         guard let spec = profile.parameter(module: module, param: param),
               let index = modules.firstIndex(where: { $0.id == module }) else { return }
+        lastInteraction = Date()
         let clamped = spec.clamp(value)
         modules[index].values[param] = clamped
         codec.setParameter(module, param: param, value: clamped)
@@ -369,8 +372,11 @@ final class AmpDevice: ObservableObject, Identifiable {
         switch event {
         case .connected:
             status = .connected
+            startStateSync()
         case .disconnected(let reason):
             if let reason { lastError = reason }
+            syncTimer?.invalidate()
+            syncTimer = nil
         case .stateLoaded(let snap):
             // 连踩时旧请求的回包可能晚到：只要期间又切过档，就直接丢掉。
             if awaitingPresetResponse {
@@ -420,11 +426,24 @@ final class AmpDevice: ObservableObject, Identifiable {
         }
     }
 
+    /// 每隔几秒读一次当前状态，补回快扭旋钮时丢掉的上报。
+    private func startStateSync() {
+        guard profile.capabilities.stateReadback else { return }
+        syncTimer?.invalidate()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+            guard let self, self.status.isConnected, !self.awaitingPresetResponse else { return }
+            guard Date().timeIntervalSince(self.lastInteraction) > 2.0 else { return }
+            self.codec.requestState()
+        }
+    }
+
     private var captureWork: DispatchWorkItem?
     private var presetReloadWork: DispatchWorkItem?
     private var presetTimeoutWork: DispatchWorkItem?
     private var queuedPresetIndex: Int?
     private var awaitingPresetResponse = false
+    private var syncTimer: Timer?
+    private var lastInteraction = Date.distantPast
     private var presetSelectionCounter = 0
     private var awaitingPresetCounter: Int?
 
