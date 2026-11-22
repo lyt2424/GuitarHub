@@ -153,14 +153,7 @@ final class AmpDevice: ObservableObject, Identifiable {
         lastInteraction = Date()
         log("切档请求[\(source)] → \(index + 1)")
 
-        // 上一档还没确认回来：先记下最后一次目标，等确认后再执行，避免命令被音箱丢掉。
-        if awaitingPresetResponse {
-            queuedPresetIndex = index
-            presetIndex = index
-            presetName = displayName(at: index)
-            return
-        }
-
+        // 不做排队：每次操作立即下发，保证手感；失败由后续校验/巡检补。
         presetIndex = index
         lastError = nil
 

@@ -146,52 +146,59 @@ private struct GuitarDeviceView: View {
                     .tint(Theme.accent)
                 }
 
-                // 4 个预设块，点哪个跳哪个
-                HStack(spacing: 10) {
-                    ForEach(0..<device.effectivePresetCount, id: \.self) { index in
-                        let palette: [Color] = [
-                            Color(hex: "#3B82F6") ?? .blue,
-                            Color(hex: "#14B8A6") ?? .teal,
-                            Color(hex: "#A855F7") ?? .purple,
-                            Color(hex: "#F97316") ?? .orange
-                        ]
-                        let tint = palette[index % palette.count]
-                        let selected = index == device.presetIndex
-                        Button {
-                            device.selectPreset(index)
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text("\(index + 1)")
-                                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                // 当前预设放大，其余缩小；只显示中文名，不显示序号。
+                GeometryReader { geo in
+                    let spacing: CGFloat = 10
+                    let bigWidth = geo.size.width * 0.46
+                    let smallWidth = (geo.size.width - bigWidth - spacing * 3) / 3
+                    HStack(spacing: spacing) {
+                        ForEach(0..<device.effectivePresetCount, id: \.self) { index in
+                            let palette: [Color] = [
+                                Color(hex: "#3B82F6") ?? .blue,
+                                Color(hex: "#14B8A6") ?? .teal,
+                                Color(hex: "#A855F7") ?? .purple,
+                                Color(hex: "#F97316") ?? .orange
+                            ]
+                            let tint = palette[index % palette.count]
+                            let selected = index == device.presetIndex
+                            Button {
+                                device.selectPreset(index)
+                            } label: {
                                 Text(device.displayName(at: index))
-                                    .font(.caption2.weight(.medium))
+                                    .font(.system(size: selected ? 30 : 14,
+                                                  weight: .bold,
+                                                  design: .rounded))
                                     .lineLimit(2)
-                                    .minimumScaleFactor(0.7)
+                                    .minimumScaleFactor(0.5)
                                     .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 6)
+                                    .frame(width: selected ? bigWidth : smallWidth,
+                                           height: selected ? 150 : 96)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(selected ? tint : tint.opacity(0.25))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .stroke(Color.white.opacity(selected ? 0.9 : 0.12),
+                                                    lineWidth: selected ? 3 : 1)
+                                    )
+                                    .foregroundStyle(.white)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 96)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(selected ? tint : tint.opacity(0.28))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.white.opacity(selected ? 0.9 : 0.15),
-                                            lineWidth: selected ? 3 : 1)
-                            )
-                            .foregroundStyle(.white)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("重命名") {
-                                renameIndex = index
-                                draftName = device.displayName(at: index)
-                                renamingPreset = true
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("重命名") {
+                                    renameIndex = index
+                                    draftName = device.displayName(at: index)
+                                    renamingPreset = true
+                                }
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .frame(height: 150)
+                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: device.presetIndex)
 
                 HStack(spacing: 12) {
                     Button {
