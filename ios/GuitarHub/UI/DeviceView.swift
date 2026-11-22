@@ -218,6 +218,17 @@ struct DeviceDetailView: View {
                         .font(.caption)
                 }
 
+                Button {
+                    let keywords = ["预设回报", "槽位", "已读取音色", "0138", "切到预设", "读取"]
+                    let picked = device.logLines.filter { line in
+                        keywords.contains { line.contains($0) }
+                    }
+                    UIPasteboard.general.string = picked.suffix(60).joined(separator: "\n")
+                } label: {
+                    Label("复制关键日志", systemImage: "line.3.horizontal.decrease.circle")
+                        .font(.caption)
+                }
+
                 ForEach(Array(device.logLines.suffix(80).enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.caption2.monospaced())
