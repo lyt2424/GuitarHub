@@ -154,10 +154,17 @@ final class SparkCodec: DeviceCodec {
         preset = parsed
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
         // 优先用“我们请求的那个号”，避免回包里的旧 curr 把界面带偏。
+        // 音箱回报的 curr 才是它当前真正停留的档位。
+        if parsed.currentPreset < profile.capabilities.presetCount {
+            preset?.currentPreset = parsed.currentPreset
+        }
         let rawIndex = expectedPresetIndex
             ?? (parsed.currentPreset < profile.capabilities.presetCount
                 ? parsed.currentPreset
                 : parsed.presetNumber)
+        if let expected = expectedPresetIndex, expected != parsed.currentPreset {
+            eventHandler?(.log("音箱没切过去：目标 \(expected + 1)，实际 \(parsed.currentPreset + 1)"))
+        }
         expectedPresetIndex = nil
         let index = min(max(0, rawIndex), max(0, profile.capabilities.presetCount - 1))
         var modules: [ModuleState] = []
@@ -231,9 +238,9 @@ final class SparkCodec: DeviceCodec {
         let target = min(max(0, index), maxIndex)
         let current = preset?.currentPreset ?? 0
         send(cmd: 0x01, sub: 0x38, payload: [UInt8(current & 0xFF), UInt8(target & 0xFF)])
-        // 音箱以“当前号 + 目标号”判断切换，本地必须同步，否则下一次会被忽略。
-        preset?.currentPreset = target
-        preset?.presetNumber = target
+        // 不要本地抢先改 current：音箱可能丢掉这条命令，
+        // 一旦本地和音箱不一致，后续切换都会带着错误的“当前档”被忽略。
+        // current 只以音箱回报的 curr / 0338 为准。
     }
 
     func setModule(_ module: ModuleID, enabled: Bool) {
