@@ -31,7 +31,15 @@ final class ModuleAUHost: ObservableObject {
         status = "正在查找 KORG Module 插件…"
 
         // 列出系统里所有 AUv3 组件，便于诊断。
-        let all = AVAudioUnitComponentManager.shared().components
+        // 注意：必须用 components(matching:)，直接写 .components 会和同名方法产生歧义。
+        let query = AudioComponentDescription(
+            componentType: kAudioUnitType_MusicDevice,
+            componentSubType: 0,
+            componentManufacturer: 0,
+            componentFlags: 0,
+            componentFlagsMask: 0
+        )
+        let all = AVAudioUnitComponentManager.shared().components(matching: query)
         discoveredComponents = all.map { "\($0.name) · \($0.manufacturerName)" }
 
         let candidates = all.filter { component in
