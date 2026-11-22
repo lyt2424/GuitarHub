@@ -187,8 +187,7 @@ final class AmpDevice: ObservableObject, Identifiable {
                 guard let self, self.awaitingPresetResponse else { return }
                 self.awaitingPresetResponse = false
                 self.awaitingPresetCounter = nil
-                // 音箱可能压根没回状态：直接读一次当前状态，把本地档位拉回真实值。
-                self.codec.requestState()
+                // 不再主动补发/重读，避免和硬件旋钮抢控制权。
                 if let next = self.queuedPresetIndex {
                     self.queuedPresetIndex = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in

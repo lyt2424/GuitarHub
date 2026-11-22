@@ -108,9 +108,9 @@ final class SparkCodec: DeviceCodec {
             }
 
         case 0x0338:
-            // 音箱硬件旋钮主动上报：载荷是 [新档, 旧档]，第一个字节才是新档。
+            // 音箱硬件旋钮主动上报：载荷是 [旧档, 新档]，第二个字节才是新档。
             guard message.payload.count >= 2 else { return }
-            let index = Int(message.payload[0])
+            let index = Int(message.payload[1])
             preset?.currentPreset = index
             preset?.presetNumber = index
             eventHandler?(.presetIndex(index))
@@ -168,23 +168,12 @@ final class SparkCodec: DeviceCodec {
         preset = parsed
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
         // 优先用“我们请求的那个号”，避免回包里的旧 curr 把界面带偏。
-        // 音箱回报的 curr 才是它当前真正停留的档位。
-        if parsed.currentPreset < profile.capabilities.presetCount {
+        // 主动读取某档时，回包就是那档的内容；不要把回包里可能滞后的 curr 当成显示号。
+        let rawIndex = expectedPresetIndex ?? parsed.presetNumber
+        if let expected = expectedPresetIndex {
+            preset?.currentPreset = expected
+        } else if parsed.currentPreset < profile.capabilities.presetCount {
             preset?.currentPreset = parsed.currentPreset
-        }
-        let rawIndex = expectedPresetIndex
-            ?? (parsed.currentPreset < profile.capabilities.presetCount
-                ? parsed.currentPreset
-                : parsed.presetNumber)
-        if let expected = expectedPresetIndex, expected != parsed.currentPreset {
-            eventHandler?(.log("音箱没切过去：目标 \(expected + 1)，实际 \(parsed.currentPreset + 1)"))
-            // 用真实当前档为基准，再补发一次目标档。
-            if presetRetryCount < 1 {
-                presetRetryCount += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.selectPreset(expected)
-                }
-            }
         }
         expectedPresetIndex = nil
         let index = min(max(0, rawIndex), max(0, profile.capabilities.presetCount - 1))
