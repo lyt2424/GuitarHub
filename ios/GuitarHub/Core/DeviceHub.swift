@@ -60,8 +60,7 @@ final class DeviceHub: ObservableObject {
            !device.status.isConnected, !device.status.isBusy {
             device.connectLast()
         }
-        if UserDefaults.standard.string(forKey: "last.pedal") != nil,
-           !pedalInput.status.isConnected, !pedalInput.status.isBusy {
+        if !pedalInput.status.isConnected, !pedalInput.status.isBusy {
             pedalInput.connectLast()
         }
     }
@@ -112,8 +111,7 @@ final class DeviceHub: ObservableObject {
         }
 
         // 踏板单独自动重连（和音箱是两条 BLE）。
-        if UserDefaults.standard.string(forKey: "last.pedal") != nil,
-           !pedalInput.status.isConnected, !pedalInput.status.isBusy {
+        if !pedalInput.status.isConnected, !pedalInput.status.isBusy {
             pedalInput.connectLast()
         }
 
