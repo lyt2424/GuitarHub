@@ -161,6 +161,35 @@ private struct GuitarDeviceView: View {
                     renaming = true
                 }
 
+                // 快捷槽：直接跳到任意预设（绝对跳转）。
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(0..<device.effectivePresetCount, id: \.self) { index in
+                            Button {
+                                device.selectPreset(index)
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text("\(index + 1)")
+                                        .font(.subheadline.weight(.bold).monospacedDigit())
+                                    Text(device.displayName(at: index))
+                                        .font(.system(size: 9))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                }
+                                .frame(width: 66, height: 40)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(index == device.presetIndex
+                                              ? Theme.accent.opacity(0.85)
+                                              : Theme.cardHigh)
+                                )
+                                .foregroundStyle(index == device.presetIndex ? .white : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
                 HStack(spacing: 10) {
                     iconButton("chevron.left") { device.stepPreset(-1) }
                     iconButton("chevron.right") { device.stepPreset(1) }
