@@ -148,7 +148,7 @@ final class DeviceHub: ObservableObject {
             UserDefaults.standard.set(true, forKey: key)
         }
 
-        let sparkKey = "migration.banks.spark.v3"
+        let sparkKey = "migration.banks.spark.v4"
         if !UserDefaults.standard.bool(forKey: sparkKey) {
             if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Spark Mini" }) {
                 store.data.pedalBanks[index] = PedalBank.sparkStarter()
