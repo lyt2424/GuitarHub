@@ -17,7 +17,6 @@ final class KorgController: ObservableObject {
     @Published private(set) var lastSendDescription = "—"
 
     let midi: MIDIService
-    weak var blePeripheral: BLEMIDIPeripheral?
     private let store: AppStore
 
     init(midi: MIDIService, store: AppStore) {
@@ -91,14 +90,8 @@ final class KorgController: ObservableObject {
     }
 
     private func sendMessage(_ message: MIDIMessage, description: String) {
-        let useBLE = store.data.settings.korgBLEOutput ?? false
-        if useBLE {
-            blePeripheral?.send(message.bytes)
-        } else {
-            midi.send([message], description: description)
-        }
-        let subs = blePeripheral?.subscriberCount ?? 0
-        lastSendDescription = useBLE ? "\(description)（BLE 订阅 \(subs)）" : description
+        midi.send([message], description: description)
+        lastSendDescription = description
     }
 
     private func sendPC(_ program: Int) {
@@ -130,13 +123,7 @@ final class KorgController: ObservableObject {
                 guard let self else { return }
                 let ch = offset + 1
                 let message = MIDIMessage.programChange(channel: ch, program: base)
-                let useBLE = self.store.data.settings.korgBLEOutput ?? false
-                if useBLE {
-                    self.blePeripheral?.send(message.bytes)
-                } else {
-                    self.midi.send([message], description: "扫描 ch\(ch)")
-                }
-                self.lastSendDescription = "扫描 ch\(ch) PC \(base)"
+                self.sendMessage(message, description: "扫描 ch\(ch) PC \(base)")
             }
         }
     }

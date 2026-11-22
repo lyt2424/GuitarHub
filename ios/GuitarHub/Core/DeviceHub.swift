@@ -14,8 +14,6 @@ final class DeviceHub: ObservableObject {
     let korg: KorgController
     let pedal: PedalRouter
     let pedalInput: BLEMIDIPedal
-    let bleMIDI: BLEMIDIPeripheral
-    let moduleHost = ModuleAUHost()
 
     @Published private(set) var devices: [AmpDevice] = []
     @Published private(set) var mode: AppMode = .launch
@@ -28,7 +26,6 @@ final class DeviceHub: ObservableObject {
         let korg = KorgController(midi: midi, store: store)
         let pedal = PedalRouter(store: store, korg: korg)
         let pedalInput = BLEMIDIPedal()
-        let bleMIDI = BLEMIDIPeripheral()
 
         self.store = store
         self.profiles = profiles
@@ -36,11 +33,8 @@ final class DeviceHub: ObservableObject {
         self.korg = korg
         self.pedal = pedal
         self.pedalInput = pedalInput
-        self.bleMIDI = bleMIDI
-        korg.blePeripheral = bleMIDI
         self.selectedDeviceID = UserDefaults.standard.string(forKey: "selected.device")
             ?? profiles.profiles.first?.id
-        pedal.moduleHost = moduleHost
 
         buildDevices()
         ensureBanks()
@@ -89,11 +83,6 @@ final class DeviceHub: ObservableObject {
         applySelection(connect: true)
     }
 
-    func enterKeyboard() {
-        mode = .keyboard
-        applySelection(connect: false)
-    }
-
     func backToLaunch() {
         mode = .launch
         applySelection(connect: false)
@@ -114,7 +103,7 @@ final class DeviceHub: ObservableObject {
 
     private func applySelection(connect: Bool) {
         let activeID = mode == .guitar ? selectedDeviceID : nil
-        pedal.setActive(deviceID: activeID, keyboard: mode == .keyboard)
+        pedal.setActive(deviceID: activeID, keyboard: false)
 
         for device in devices where device.profile.id != activeID {
             if device.status.isConnected || device.status.isBusy {
@@ -124,9 +113,8 @@ final class DeviceHub: ObservableObject {
 
         let bankName: String
         switch mode {
-        case .keyboard: bankName = BankNames.keyboard
-        case .guitar:   bankName = selectedDevice?.profile.name ?? ""
-        case .launch:   bankName = ""
+        case .guitar: bankName = selectedDevice?.profile.name ?? ""
+        case .launch: bankName = ""
         }
         if !bankName.isEmpty,
            let bank = store.data.pedalBanks.first(where: { $0.name == bankName }) {
@@ -157,9 +145,6 @@ final class DeviceHub: ObservableObject {
         for profile in profiles.profiles where !banks.contains(where: { $0.name == profile.name }) {
             banks.append(PedalBank.ampStarter(device: profile.id, name: profile.name))
         }
-        if !banks.contains(where: { $0.name == BankNames.keyboard }) {
-            banks.append(PedalBank.korgStarter())
-        }
         if banks.map(\.id) != store.data.pedalBanks.map(\.id) {
             store.data.pedalBanks = banks
         }
@@ -173,14 +158,6 @@ final class DeviceHub: ObservableObject {
             store.data.pedalBanks[index] = PedalBank.pulzeStarter()
         }
         UserDefaults.standard.set(true, forKey: key)
-
-        let korgKey = "migration.banks.korg.v2"
-        if !UserDefaults.standard.bool(forKey: korgKey) {
-            if let index = store.data.pedalBanks.firstIndex(where: { $0.name == BankNames.keyboard }) {
-                store.data.pedalBanks[index] = PedalBank.korgStarter()
-            }
-            UserDefaults.standard.set(true, forKey: korgKey)
-        }
     }
 
     private func makeDevice(profile: DeviceProfile) -> AmpDevice {

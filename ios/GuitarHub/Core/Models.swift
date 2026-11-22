@@ -494,7 +494,6 @@ extension DeviceCodec {
 /// 两种模式互斥，同一时刻只连一种设备。
 enum AppMode: String {
     case launch
-    case keyboard
     case guitar
 }
 

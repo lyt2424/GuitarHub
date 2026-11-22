@@ -38,28 +38,6 @@ private struct SettingsContent: View {
             }
 
             Section {
-                Stepper("MIDI 通道 \(store.data.settings.korgChannel)",
-                        value: Binding(
-                            get: { store.data.settings.korgChannel },
-                            set: { store.data.settings.korgChannel = $0.clamped(to: 1...16) }
-                        ),
-                        in: 1...16)
-
-                Picker("Program Change 基准", selection: Binding(
-                    get: { store.data.settings.korgPCBase ?? 0 },
-                    set: { store.data.settings.korgPCBase = $0 }
-                )) {
-                    Text("从 0 开始").tag(0)
-                    Text("从 1 开始").tag(1)
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("KORG Module")
-            } footer: {
-                Text("Module 打开 Background Audio 并在后台运行，MIDI 输入选 “GuitarHub”，本 App 就能用 Program Change 切它的音色。\n如果 Module 的输入列表里没有这个端口，说明它不接受虚拟 MIDI：那就只用本 App 控制音箱与踏板，Module 照常手动操作。")
-            }
-
-            Section {
                 HStack {
                     Text(midi.statusText)
                         .font(.caption)

@@ -10,8 +10,6 @@ struct RootView: View {
                 LaunchView()
             case .guitar:
                 GuitarModeView()
-            case .keyboard:
-                KeyboardModeView()
             }
         }
         .tint(Theme.accent)
@@ -49,16 +47,6 @@ struct LaunchView: View {
                         if let id = hub.selectedDeviceID {
                             hub.enterGuitar(id)
                         }
-                    }
-
-                    ModeCard(
-                        icon: "pianokeys",
-                        title: "键盘模式",
-                        subtitle: "KORG Module",
-                        detail: "Program Change 控制",
-                        color: Color(red: 0.30, green: 0.62, blue: 1.0)
-                    ) {
-                        hub.enterKeyboard()
                     }
 
                     Spacer(minLength: 0)
