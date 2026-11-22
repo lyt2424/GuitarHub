@@ -34,7 +34,7 @@ final class ModuleAUHost: ObservableObject {
         // 注意：必须用 components(matching:)，直接写 .components 会和同名方法产生歧义。
         // 用底层 AudioComponent 枚举：AVAudioUnitComponentManager 在部分系统版本上
         // 不会返回第三方 AUv3，但 GarageBand 能看到的插件这里一定能看到。
-        let components = enumerateAllComponents()
+        let components = enumerateAllComponents() + managerComponents()
         discoveredComponents = components.map { item in
             let type = Self.fourCC(item.description.componentType)
             let sub = Self.fourCC(item.description.componentSubType)
@@ -52,7 +52,13 @@ final class ModuleAUHost: ObservableObject {
         // 同时装了免费版和 Pro 时，优先选名字带 Pro 的。
         guard let chosen = candidates.first(where: { $0.name.lowercased().contains("pro") })
                 ?? candidates.first else {
-            status = "没有找到 KORG Module 插件。请确认装的是 Module Pro，并先打开它一次。"
+            status = "没有找到 KORG Module 插件（已枚举 \(components.count) 个组件）。请确认装的是 Module Pro。"
+            // 某些系统上插件注册有延迟，1.5 秒后再试一次。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self, !self.isReady else { return }
+                self.status = "正在重试…"
+                self.load()
+            }
             return
         }
         let componentName = chosen.name
@@ -96,6 +102,38 @@ final class ModuleAUHost: ObservableObject {
         let url = docs.appendingPathComponent("au-components.txt")
         try? componentsDump.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    /// 通过 AVAudioUnitComponentManager 多路查询：按乐器类型、按 KORG 厂商码。
+    private func managerComponents() -> [ComponentInfo] {
+        let korg: UInt32 = 0x4B4F_5247   // 'KORG'
+        let queries = [
+            AudioComponentDescription(componentType: kAudioUnitType_MusicDevice,
+                                      componentSubType: 0,
+                                      componentManufacturer: 0,
+                                      componentFlags: 0, componentFlagsMask: 0),
+            AudioComponentDescription(componentType: kAudioUnitType_MusicDevice,
+                                      componentSubType: 0,
+                                      componentManufacturer: korg,
+                                      componentFlags: 0, componentFlagsMask: 0),
+            AudioComponentDescription(componentType: 0,
+                                      componentSubType: 0,
+                                      componentManufacturer: korg,
+                                      componentFlags: 0, componentFlagsMask: 0)
+        ]
+
+        var results: [ComponentInfo] = []
+        var seen = Set<String>()
+        for query in queries {
+            for unit in AVAudioUnitComponentManager.shared().components(matching: query) {
+                let key = "\(unit.name)-\(unit.audioComponentDescription.componentSubType)"
+                guard seen.insert(key).inserted else { continue }
+                results.append(ComponentInfo(name: unit.name,
+                                             manufacturer: unit.manufacturerName,
+                                             description: unit.audioComponentDescription))
+            }
+        }
+        return results
     }
 
     private struct ComponentInfo {
