@@ -158,7 +158,12 @@ final class AmpDevice: ObservableObject, Identifiable {
             // 给音箱一点时间完成切换，再读回状态，否则会读到旧音色。
             for delay in [0.35, 1.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    self?.codec.requestState()
+                    guard let self else { return }
+                    if let spark = self.codec as? SparkCodec {
+                        spark.requestPreset(index)
+                    } else {
+                        self.codec.requestState()
+                    }
                 }
             }
             store.setLastUsedPreset(index, for: profile.id)

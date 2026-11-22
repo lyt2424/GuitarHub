@@ -194,6 +194,14 @@ final class SparkCodec: DeviceCodec {
         send(cmd: 0x02, sub: 0x01, payload: payload, blockHeader: blockHeader)
     }
 
+    /// 读取指定硬件预设的完整状态（切档后用它，不能只读“当前状态”）。
+    func requestPreset(_ index: Int) {
+        var payload: [UInt8] = [0x00, UInt8(clamping: index)]
+        payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
+        eventHandler?(.log("读取预设 \(index + 1) 的状态"))
+        send(cmd: 0x02, sub: 0x01, payload: payload)
+    }
+
     func requestName() {
         send(cmd: 0x02, sub: 0x11, payload: [])
     }
