@@ -95,15 +95,28 @@ final class SparkCodec: DeviceCodec {
         case 0x0104, 0x0337:
             handleParameter(message.payload)
 
-        case 0x0138, 0x0338:
+        case 0x0138:
+            // App 发起的切档：载荷是 [旧档, 新档]。
             guard message.payload.count >= 2 else { return }
-            preset?.currentPreset = Int(message.payload[1])
-            preset?.presetNumber = Int(message.payload[1])
-            eventHandler?(.presetIndex(Int(message.payload[1])))
-            eventHandler?(.log("音箱切到预设 \(Int(message.payload[1]) + 1)"))
-            // 切档后主动重读一次，确保模块开关和参数跟新预设一致。
+            let index = Int(message.payload[1])
+            preset?.currentPreset = index
+            preset?.presetNumber = index
+            eventHandler?(.presetIndex(index))
+            eventHandler?(.log("音箱切到预设 \(index + 1)"))
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                self?.requestState()
+                self?.requestPreset(index)
+            }
+
+        case 0x0338:
+            // 音箱硬件旋钮主动上报：载荷是 [新档, 旧档]，第一个字节才是新档。
+            guard message.payload.count >= 2 else { return }
+            let index = Int(message.payload[0])
+            preset?.currentPreset = index
+            preset?.presetNumber = index
+            eventHandler?(.presetIndex(index))
+            eventHandler?(.log("硬件旋钮切到预设 \(index + 1)"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                self?.requestPreset(index)
             }
 
         case 0x0363:
