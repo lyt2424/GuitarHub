@@ -1,21 +1,12 @@
 import Foundation
 import Combine
 
-/// 本地持久化：预设库、KORG 音色表、踏板映射、设置。
+/// 本地持久化：预设库、踏板映射、设置。
 /// 全部存在 Application Support/GuitarHub/store.json，随改随存（0.6 秒防抖）。
 final class AppStore: ObservableObject {
 
     struct Settings: Codable, Hashable {
         var sparkPresetCount: Int = 4
-        var korgChannel: Int = 1
-        /// KORG 的 Program Change 基准：0 或 1（有些 Set List 从 1 开始）。
-        var korgPCBase: Int? = nil
-        /// 是否用 BLE MIDI 外设模式发给 iPad。
-        var korgBLEOutput: Bool? = nil
-        /// 转调（半音，-11…+11）。
-        var korgTranspose: Int? = nil
-        /// 转调发送方式："display" 只显示；"rpn" 发 RPN 2（Master Coarse Tuning）。
-        var transposeMode: String? = nil
         var hapticsEnabled: Bool = true
         /// 召回音色时是否把本地保存的模块状态整包推给设备。
         var pushFullStateOnRecall: Bool = true
@@ -48,9 +39,7 @@ final class AppStore: ObservableObject {
         var settings: Settings = .default
         /// key = DeviceProfileID
         var libraries: [String: DeviceLibrary] = [:]
-        var korgSetlists: [KorgSetlist] = []
         var pedalBanks: [PedalBank] = []
-        var activeKorgSetlistID: UUID?
         var activeBankID: UUID?
     }
 
@@ -93,19 +82,9 @@ final class AppStore: ObservableObject {
         var d = data
         var changed = false
 
-        if d.korgSetlists.isEmpty {
-            let list = KorgSetlist.starter()
-            d.korgSetlists = [list]
-            d.activeKorgSetlistID = list.id
-            changed = true
-        }
-        if d.activeKorgSetlistID == nil {
-            d.activeKorgSetlistID = d.korgSetlists.first?.id
-            changed = true
-        }
         if d.pedalBanks.isEmpty {
-            // 三套踏板组，分别对应三种演出目标；切换目标时自动选组。
-            let banks = [PedalBank.sparkStarter(), PedalBank.pulzeStarter(), PedalBank.korgStarter()]
+            // 两套踏板组，分别对应 Spark Mini / Pulze Mini。
+            let banks = [PedalBank.sparkStarter(), PedalBank.pulzeStarter()]
             d.pedalBanks = banks
             d.activeBankID = banks.first?.id
             changed = true
@@ -180,21 +159,6 @@ final class AppStore: ObservableObject {
         var lib = library(kind)
         lib.lastUsedPreset = index
         data.libraries[kind] = lib
-    }
-
-    // MARK: - KORG
-
-    var activeKorgSetlist: KorgSetlist? {
-        guard let id = data.activeKorgSetlistID else { return data.korgSetlists.first }
-        return data.korgSetlists.first { $0.id == id } ?? data.korgSetlists.first
-    }
-
-    func updateKorgSetlist(_ list: KorgSetlist) {
-        if let index = data.korgSetlists.firstIndex(where: { $0.id == list.id }) {
-            data.korgSetlists[index] = list
-        } else {
-            data.korgSetlists.append(list)
-        }
     }
 
     // MARK: - 踏板

@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// 把踏板（BLE MIDI 或系统 MIDI）的 CC / Note / PC 映射成对音箱、KORG Module 的操作。
+/// 把踏板（BLE MIDI）的 CC / Note / PC 映射成对音箱的操作。
 final class PedalRouter: ObservableObject {
 
     @Published var lastEvent: String = "等待踏板…"
@@ -11,15 +11,12 @@ final class PedalRouter: ObservableObject {
     var onFeedback: ((String) -> Void)?
 
     private let store: AppStore
-    private let korg: KorgController
     private var devices: [DeviceProfileID: AmpDevice] = [:]
     private var activeDeviceID: DeviceProfileID?
-    private var keyboardMode = false
     private var drumPlaying: [DeviceProfileID: Bool] = [:]
 
-    init(store: AppStore, korg: KorgController) {
+    init(store: AppStore) {
         self.store = store
-        self.korg = korg
     }
 
     func attach(devices: [AmpDevice]) {
@@ -27,9 +24,8 @@ final class PedalRouter: ObservableObject {
     }
 
     /// 进入某个入口后，只让当前模式相关的映射生效。
-    func setActive(deviceID: DeviceProfileID?, keyboard: Bool) {
+    func setActive(deviceID: DeviceProfileID?) {
         self.activeDeviceID = deviceID
-        self.keyboardMode = keyboard
     }
 
     // MARK: - 入口
@@ -110,17 +106,8 @@ final class PedalRouter: ObservableObject {
             let mapped = spec.minValue + Double(value) / 127.0 * span
             amp.setParameter(module, param: param, value: mapped)
 
-        case .korgProgram(let program):
-            guard keyboardMode else { return skip("KORG") }
-            korg.select(program: program)
-
-        case .korgStep(let delta):
-            guard keyboardMode else { return skip("KORG") }
-            korg.step(delta)
-
-        case .korgSetlistNext:
-            guard keyboardMode else { return skip("KORG") }
-            korg.nextSetlist()
+        case .korgProgram, .korgStep, .korgSetlistNext:
+            return skip("已停用的 Module 动作")
 
         case .drumToggle(let device):
             guard isActive(device) else { return skip(device) }

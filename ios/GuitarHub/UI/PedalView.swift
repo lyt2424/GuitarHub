@@ -19,7 +19,6 @@ struct PedalView: View {
         switch bank.name {
         case "Pulze Mini":            replacement = PedalBank.pulzeStarter()
         case "Spark Mini":            replacement = PedalBank.sparkStarter()
-        case BankNames.keyboard:      replacement = PedalBank.korgStarter()
         default:                      replacement = bank
         }
         replacement.id = bank.id
@@ -34,7 +33,7 @@ struct PedalView: View {
                 } header: {
                     Text("蓝牙 MIDI 踏板")
                 } footer: {
-                    Text("踏板直连本 App（不经过系统蓝牙 MIDI），因此可以由 App 决定转发给音箱还是 KORG。常用型号：iRig BlueBoard、M-Vave Chocolate、XSONIC Airstep、Hotone Pulze Control。")
+                    Text("踏板直连本 App（不经过系统蓝牙 MIDI）。常用型号：iRig BlueBoard、M-Vave Chocolate、XSONIC Airstep、Hotone Pulze Control。")
                 }
 
                 Section("踏板组") {
@@ -192,7 +191,6 @@ private struct PedalConnectionCard: View {
 
 enum ActionKind: String, CaseIterable, Identifiable, Hashable {
     case none, ampModule, ampPresetStep, ampPreset, ampTapTempo, ampParamFollow
-    case korgProgram, korgStep, korgSetlistNext
     case drumToggle, drumStep
     case bankStep
 
@@ -205,9 +203,6 @@ enum ActionKind: String, CaseIterable, Identifiable, Hashable {
         case .ampPreset:       return "跳到指定音色"
         case .ampTapTempo:     return "Tap Tempo"
         case .ampParamFollow:  return "表情踏板跟随参数"
-        case .korgProgram:     return "Module 指定音色"
-        case .korgStep:        return "Module 上/下一个音色"
-        case .korgSetlistNext: return "Module 下一音色表"
         case .drumToggle:      return "鼓机 播放/停止"
         case .drumStep:        return "鼓机 上一个/下一个"
         case .bankStep:        return "切换踏板组"
@@ -252,10 +247,6 @@ struct MappingEditor: View {
             case .ampParamFollow(let device, let module, _):
                 _deviceID = State(initialValue: device)
                 _moduleID = State(initialValue: module)
-            case .korgProgram(let program):
-                _index = State(initialValue: program)
-            case .korgStep(let value):
-                _delta = State(initialValue: value)
             default:
                 break
             }
@@ -282,9 +273,7 @@ struct MappingEditor: View {
                         }
                     }
 
-                    if actionKind != .none && actionKind != .korgProgram
-                        && actionKind != .korgStep && actionKind != .korgSetlistNext
-                        && actionKind != .bankStep {
+                    if actionKind != .none && actionKind != .bankStep {
                         Picker("设备", selection: $deviceID) {
                             ForEach(hub.devices) { device in
                                 Text(device.profile.name).tag(device.profile.id)
@@ -306,11 +295,10 @@ struct MappingEditor: View {
                         }
                     }
 
-                    if actionKind == .ampPreset || actionKind == .korgProgram {
+                    if actionKind == .ampPreset {
                         Stepper("目标编号 \(index)", value: $index, in: 0...127)
                     }
-                    if actionKind == .ampPresetStep || actionKind == .korgStep
-                        || actionKind == .drumStep || actionKind == .bankStep {
+                    if actionKind == .ampPresetStep || actionKind == .drumStep || actionKind == .bankStep {
                         Stepper("步进 \(delta > 0 ? "+1" : "-1")", value: $delta, in: -1...1)
                     }
                 }
@@ -356,9 +344,6 @@ struct MappingEditor: View {
         case .ampTapTempo: action = .ampTapTempo(device: deviceID)
         case .ampParamFollow:
             action = .ampParamFollow(device: deviceID, module: moduleID, param: 0)
-        case .korgProgram: action = .korgProgram(program: index)
-        case .korgStep: action = .korgStep(delta: delta >= 0 ? 1 : -1)
-        case .korgSetlistNext: action = .korgSetlistNext
         case .drumToggle: action = .drumToggle(device: deviceID)
         case .drumStep: action = .drumStep(device: deviceID, delta: delta >= 0 ? 1 : -1)
         case .bankStep: action = .bankStep(delta: delta >= 0 ? 1 : -1)
@@ -389,12 +374,10 @@ struct MappingEditor: View {
         case .ampPreset: return .ampPreset
         case .ampTapTempo: return .ampTapTempo
         case .ampParamFollow: return .ampParamFollow
-        case .korgProgram: return .korgProgram
-        case .korgStep: return .korgStep
-        case .korgSetlistNext: return .korgSetlistNext
         case .drumToggle: return .drumToggle
         case .drumStep: return .drumStep
         case .bankStep: return .bankStep
+        case .korgProgram, .korgStep, .korgSetlistNext: return .none
         }
     }
 }

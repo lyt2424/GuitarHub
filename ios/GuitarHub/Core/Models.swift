@@ -490,16 +490,15 @@ extension DeviceCodec {
 
 // MARK: - App 入口模式
 
-/// 启动后先选入口：键盘（KORG Module）或电吉他（音箱/效果器）。
-/// 两种模式互斥，同一时刻只连一种设备。
+/// 启动页直接选设备，同一时刻只连一台。
 enum AppMode: String {
     case launch
     case guitar
 }
 
-/// 键盘模式使用的踏板组名。
 enum BankNames {
-    static let keyboard = "键盘模式"
+    static let spark = "Spark Mini"
+    static let pulze = "Pulze Mini"
 }
 
 // MARK: - 工具

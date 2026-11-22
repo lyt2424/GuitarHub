@@ -2,8 +2,7 @@ import Foundation
 import Combine
 
 /// 蓝牙 MIDI 踏板：直接作为 BLE 中心连接踏板的 BLE MIDI 服务，
-/// 这样踏板消息只会进本 App，由 App 决定转发给音箱还是 KORG Module，
-/// 避免"系统级 BLE MIDI + App 直连"造成同一条消息触发两次。
+/// 这样踏板消息只会进本 App，避免"系统级 BLE MIDI + App 直连"造成同一条消息触发两次。
 final class BLEMIDIPedal: ObservableObject {
 
     let session = BLESession()

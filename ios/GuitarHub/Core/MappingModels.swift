@@ -1,39 +1,5 @@
 import Foundation
 
-// MARK: - KORG Module 音色表
-//
-// Module 通过 Program Change 按 Set List 顺序切换音色，App 维护"槽位表"：
-// 第 n 个槽位 = 发送 PC n + 一个用户填写的显示名。
-
-struct KorgSlot: Codable, Identifiable, Hashable {
-    var id: UUID = UUID()
-    var program: Int
-    var name: String
-    var memo: String = ""
-}
-
-struct KorgSetlist: Codable, Identifiable, Hashable {
-    var id: UUID = UUID()
-    var name: String
-    /// 1…16
-    var midiChannel: Int = 1
-    var slots: [KorgSlot] = []
-
-    static func starter() -> KorgSetlist {
-        KorgSetlist(
-            name: "默认音色表",
-            midiChannel: 1,
-            slots: (0..<12).map { i in
-                KorgSlot(program: i, name: "音色 \(i + 1)", memo: "")
-            }
-        )
-    }
-
-    func slot(program: Int) -> KorgSlot? {
-        slots.first { $0.program == program }
-    }
-}
-
 // MARK: - 踏板映射
 
 enum PedalTrigger: Codable, Hashable {
@@ -66,16 +32,17 @@ enum PedalAction: Codable, Hashable {
     /// 表情踏板跟随某个参数
     case ampParamFollow(device: DeviceProfileID, module: ModuleID, param: Int)
 
-    case korgProgram(program: Int)
-    case korgStep(delta: Int)
-    case korgSetlistNext
-
     /// 鼓机播放 / 停止（设备不回报状态，App 自己记）。
     case drumToggle(device: DeviceProfileID)
     /// 鼓机上一个 / 下一个节奏。
     case drumStep(device: DeviceProfileID, delta: Int)
 
     case bankStep(delta: Int)
+
+    // 旧版本遗留的 Module 动作：只用于兼容旧数据解码，界面和路由里已不再使用。
+    case korgProgram(program: Int)
+    case korgStep(delta: Int)
+    case korgSetlistNext
 
     var label: String {
         switch self {
@@ -91,18 +58,14 @@ enum PedalAction: Codable, Hashable {
             return "\(d) · Tap Tempo"
         case .ampParamFollow(let d, let m, let p):
             return "\(d) · \(m) 参数 \(p)"
-        case .korgProgram(let p):
-            return "Module · 音色 \(p + 1)"
-        case .korgStep(let delta):
-            return "Module · \(delta > 0 ? "下一音色" : "上一音色")"
-        case .korgSetlistNext:
-            return "Module · 下一音色表"
         case .drumToggle(let d):
             return "\(d) · 鼓机播放/停止"
         case .drumStep(let d, let delta):
             return "\(d) · 鼓机\(delta > 0 ? "下一个" : "上一个")"
         case .bankStep(let delta):
             return "踏板 · \(delta > 0 ? "下一组" : "上一组")"
+        case .korgProgram, .korgStep, .korgSetlistNext:
+            return "（已停用）"
         }
     }
 }
@@ -125,7 +88,7 @@ struct PedalBank: Codable, Identifiable, Hashable {
     var name: String
     var mappings: [PedalMapping] = []
 
-    /// 三套默认踏板组，名字与设备配置名 / 键盘模式对应，切换入口时自动选中。
+    /// 每个设备一套默认踏板组，名字与设备配置名对应，切换入口时自动选中。
     static func sparkStarter() -> PedalBank {
         PedalBank(
             name: "Spark Mini",
@@ -155,18 +118,6 @@ struct PedalBank: Codable, Identifiable, Hashable {
         )
     }
 
-    static func korgStarter() -> PedalBank {
-        PedalBank(
-            name: BankNames.keyboard,
-            mappings: [
-                PedalMapping(trigger: .cc(number: 20), action: .korgStep(delta: -1)),
-                PedalMapping(trigger: .cc(number: 21), action: .korgStep(delta: 1)),
-                PedalMapping(trigger: .cc(number: 22), action: .korgSetlistNext),
-                PedalMapping(trigger: .cc(number: 23), action: .korgProgram(program: 0))
-            ]
-        )
-    }
-
     static func starter(device: DeviceProfileID) -> PedalBank {
         ampStarter(device: device, name: "A 组")
     }
@@ -179,8 +130,6 @@ struct PedalBank: Codable, Identifiable, Hashable {
                 PedalMapping(trigger: .cc(number: 21), action: .ampModule(device: device, module: "delay")),
                 PedalMapping(trigger: .cc(number: 22), action: .ampPresetStep(device: device, delta: 1)),
                 PedalMapping(trigger: .cc(number: 23), action: .ampPresetStep(device: device, delta: -1)),
-                PedalMapping(trigger: .cc(number: 24), action: .korgStep(delta: 1)),
-                PedalMapping(trigger: .cc(number: 25), action: .korgStep(delta: -1)),
                 PedalMapping(trigger: .expression(number: 12), action: .ampParamFollow(device: device, module: "reverb", param: 0))
             ]
         )

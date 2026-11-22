@@ -6,7 +6,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             SettingsContent(store: hub.store,
-                            midi: hub.midi,
                             profiles: hub.profiles,
                             hub: hub)
                 .navigationTitle("设置")
@@ -16,7 +15,6 @@ struct SettingsView: View {
 
 private struct SettingsContent: View {
     @ObservedObject var store: AppStore
-    @ObservedObject var midi: MIDIService
     @ObservedObject var profiles: ProfileStore
     let hub: DeviceHub
 
@@ -38,32 +36,6 @@ private struct SettingsContent: View {
             }
 
             Section {
-                HStack {
-                    Text(midi.statusText)
-                        .font(.caption)
-                    Spacer()
-                    Button("刷新") { midi.refresh() }
-                        .font(.caption)
-                }
-                ForEach(midi.destinations) { endpoint in
-                    Label(endpoint.name, systemImage: "arrow.right.circle")
-                        .font(.caption)
-                }
-                ForEach(midi.sources) { endpoint in
-                    Label(endpoint.name, systemImage: "arrow.left.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if midi.destinations.isEmpty {
-                    Text("没有发现 MIDI 目的端口（Module 未运行或未提供虚拟端口）。")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("MIDI 端口")
-            }
-
-            Section {
                 ForEach(profiles.profiles) { profile in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(profile.name).font(.subheadline)
@@ -81,12 +53,12 @@ private struct SettingsContent: View {
             } header: {
                 Text("设备配置")
             } footer: {
-                Text("把新的设备 JSON 放进「文件」App → 我的 iPhone → 吉他中枢 → Profiles，再点上面按钮即可加载，不用重新编译。同名 id 会覆盖内置配置。")
+                Text("把新的设备 JSON 放进「文件」App → 我的 iPhone → 吉他Control → Profiles，再点上面按钮即可加载，不用重新编译。同名 id 会覆盖内置配置。")
             }
 
             Section("关于") {
                 LabeledContent("版本", value: "1.0.0")
-                Text("协议来源：Paul Hamshere 的 Spark 逆向文档与 SparkIO4 实现；Hotone 官方 Pulze MIDI Control Information List（Firmware V1.0.6）；KORG Module 官方支持文档。以上均为个人学习用途，请遵守设备厂商的使用条款。")
+                Text("协议来源：Paul Hamshere 的 Spark 逆向文档与 SparkIO4 实现；Hotone 官方 Pulze MIDI Control Information List（Firmware V1.0.6）。以上均为个人学习用途，请遵守设备厂商的使用条款。")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

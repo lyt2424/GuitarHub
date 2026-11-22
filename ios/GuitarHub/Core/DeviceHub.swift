@@ -2,16 +2,13 @@ import Foundation
 import CoreBluetooth
 import Combine
 
-/// 全局装配：设备、MIDI、KORG、踏板路由。
+/// 全局装配：设备与踏板路由。
 ///
-/// 入口模型：启动后先选「键盘模式」或「电吉他模式」，两者互斥。
-/// 电吉他模式里再选一台设备（Spark / Pulze / 以后新增的），同一时刻只连这一台。
+/// 启动页直接列出设备（Spark Mini / Pulze Mini），点哪台进哪台，同一时刻只连这一台。
 final class DeviceHub: ObservableObject {
 
     let store: AppStore
     let profiles: ProfileStore
-    let midi: MIDIService
-    let korg: KorgController
     let pedal: PedalRouter
     let pedalInput: BLEMIDIPedal
 
@@ -22,15 +19,11 @@ final class DeviceHub: ObservableObject {
     init() {
         let store = AppStore()
         let profiles = ProfileStore()
-        let midi = MIDIService()
-        let korg = KorgController(midi: midi, store: store)
-        let pedal = PedalRouter(store: store, korg: korg)
+        let pedal = PedalRouter(store: store)
         let pedalInput = BLEMIDIPedal()
 
         self.store = store
         self.profiles = profiles
-        self.midi = midi
-        self.korg = korg
         self.pedal = pedal
         self.pedalInput = pedalInput
         self.selectedDeviceID = UserDefaults.standard.string(forKey: "selected.device")
@@ -42,9 +35,6 @@ final class DeviceHub: ObservableObject {
         pedal.attach(devices: devices)
         pedal.onFeedback = { [weak self] text in self?.pedal.lastEvent = text }
 
-        midi.onMessage = { [weak self] message, source in
-            self?.pedal.handle(message, source: source)
-        }
         pedalInput.onMessage = { [weak self] message in
             self?.pedal.handle(message, source: "蓝牙踏板")
         }
@@ -59,7 +49,7 @@ final class DeviceHub: ObservableObject {
 
     var guitarDevices: [AmpDevice] { devices }
 
-    /// 从后台回到前台：刷新 BLE MIDI 广播、补一次自动连接。
+    /// 从后台回到前台：补一次自动连接。
     func onAppActive() {
         prepareAutoConnect()
     }
@@ -103,7 +93,7 @@ final class DeviceHub: ObservableObject {
 
     private func applySelection(connect: Bool) {
         let activeID = mode == .guitar ? selectedDeviceID : nil
-        pedal.setActive(deviceID: activeID, keyboard: false)
+        pedal.setActive(deviceID: activeID)
 
         for device in devices where device.profile.id != activeID {
             if device.status.isConnected || device.status.isBusy {
@@ -153,34 +143,19 @@ final class DeviceHub: ObservableObject {
     /// 旧版本把 CC20/21 绑成了别的动作；升级后一次性替换成新的默认映射。
     private func migrateBanks() {
         let key = "migration.banks.pulze.v2"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Pulze Mini" }) {
-            store.data.pedalBanks[index] = PedalBank.pulzeStarter()
+        if !UserDefaults.standard.bool(forKey: key) {
+            if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Pulze Mini" }) {
+                store.data.pedalBanks[index] = PedalBank.pulzeStarter()
+            }
+            UserDefaults.standard.set(true, forKey: key)
         }
-        UserDefaults.standard.set(true, forKey: key)
 
-        // Spark 旧的默认映射把 A/B 绑成了混响/延迟，一次性换成切音色。
         let sparkKey = "migration.banks.spark.v3"
         if !UserDefaults.standard.bool(forKey: sparkKey) {
             if let index = store.data.pedalBanks.firstIndex(where: { $0.name == "Spark Mini" }) {
                 store.data.pedalBanks[index] = PedalBank.sparkStarter()
             }
             UserDefaults.standard.set(true, forKey: sparkKey)
-        }
-
-        // 键盘模式已移除，清掉遗留的键盘踏板组。
-        let cleanupKey = "cleanup.keyboardbank.v1"
-        if !UserDefaults.standard.bool(forKey: cleanupKey) {
-            let removedIDs = store.data.pedalBanks
-                .filter { $0.name == BankNames.keyboard }
-                .map(\.id)
-            if !removedIDs.isEmpty {
-                store.data.pedalBanks.removeAll { $0.name == BankNames.keyboard }
-                if let active = store.data.activeBankID, removedIDs.contains(active) {
-                    store.data.activeBankID = store.data.pedalBanks.first?.id
-                }
-            }
-            UserDefaults.standard.set(true, forKey: cleanupKey)
         }
     }
 

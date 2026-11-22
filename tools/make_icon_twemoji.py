@@ -85,43 +85,29 @@ def load_shape():
 
 
 def main():
-    shape, hole = load_shape()
-    img = Image.new("RGB", (W, W), BG)
+    shape, _ = load_shape()
+
+    # 橙底（左上亮、右下深）
+    img = Image.new("RGB", (W, W), ACCENT)
     d = ImageDraw.Draw(img)
+    for y in range(W):
+        t = y / W
+        d.line([(0, y), (W, y)], fill=(int(255 - 30 * t), int(150 - 70 * t), int(72 - 38 * t)))
 
-    for x in range(SPLIT):
-        t = x / SPLIT
-        d.line([(x, 0), (x, W)], fill=(int(255 - 22 * t), int(140 - 58 * t), int(64 - 30 * t)))
-
+    # 白色剪影：只保留轮廓，不画音孔/琴弦等细节
+    fg = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(fg)
     for sub in shape:
-        d.polygon([(x * S, y * S) for x, y in sub], fill=WHITE)
+        fd.polygon([(x * S, y * S) for x, y in sub], fill=WHITE + (255,))
 
-    hx, hy = hole
-    r = 44
-    d.ellipse([(hx - r) * S, (hy - r) * S, (hx + r) * S, (hy + r) * S], fill=ACCENT)
+    # 仿 GarageBand 的斜向构图：琴颈朝左上
+    fg = fg.rotate(45, expand=True, resample=Image.BICUBIC)
+    fg = fg.crop(fg.getbbox())
+    fg.thumbnail((int(W * 0.9), int(W * 0.9)), Image.LANCZOS)
 
-    d.rectangle([SPLIT, 0, W, W], fill=BG)
-
-    # 键盘：8 个白键（C 起），黑键只在 C-D / D-E / F-G / G-A / A-B 之间
-    kw, kh = 1024, 512
-    kb = Image.new("RGB", (kw, kh), BG)
-    kd = ImageDraw.Draw(kb)
-    kd.rounded_rectangle([8, 8, kw - 8, kh - 8], radius=16, fill=WHITE)
-    keys = 8
-    wkw = (kw - 16) / keys
-    for i in range(1, keys):
-        x = 8 + wkw * i
-        kd.line([(x, 8), (x, kh - 8)], fill=(28, 28, 30), width=6)
-    bkw = wkw * 0.6
-    bkh = (kh - 16) * 0.58
-    for i in [0, 1, 3, 4, 5]:
-        x = 8 + wkw * (i + 1) - bkw / 2
-        kd.rectangle([x, 8, x + bkw, 8 + bkh], fill=(18, 18, 20))
-
-    kb = kb.rotate(90, expand=True).resize((512 * S, 1024 * S), Image.LANCZOS)
-    img.paste(kb, (SPLIT, 0))
-
-    img.resize((UNIT, UNIT), Image.LANCZOS).save("AppIcon.png")
+    canvas = img.convert("RGBA")
+    canvas.alpha_composite(fg, ((W - fg.width) // 2, (W - fg.height) // 2))
+    canvas.convert("RGB").resize((UNIT, UNIT), Image.LANCZOS).save("AppIcon.png")
     print("saved")
 
 

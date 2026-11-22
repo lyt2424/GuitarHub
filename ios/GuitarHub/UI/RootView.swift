@@ -29,23 +29,23 @@ struct LaunchView: View {
                 Theme.background.ignoresSafeArea()
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("舞台Control")
+                        Text("吉他Control")
                             .font(.system(size: 34, weight: .bold))
-                        Text("电吉他演出控制")
+                        Text("选择今天要用的音箱")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 12)
 
-                    ModeCard(
-                        icon: "guitars",
-                        title: "电吉他模式",
-                        subtitle: hub.selectedDevice?.profile.name ?? "音箱 / 效果器",
-                        detail: hub.selectedDevice.map { $0.status.label } ?? "未选择设备",
-                        color: Theme.accent
-                    ) {
-                        if let id = hub.selectedDeviceID {
-                            hub.enterGuitar(id)
+                    ForEach(hub.guitarDevices) { device in
+                        ModeCard(
+                            icon: "guitars",
+                            title: device.profile.name,
+                            subtitle: device.profile.vendor,
+                            detail: device.status.label,
+                            color: Theme.accent
+                        ) {
+                            hub.enterGuitar(device.profile.id)
                         }
                     }
 
