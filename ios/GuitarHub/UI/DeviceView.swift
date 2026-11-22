@@ -192,6 +192,13 @@ struct DeviceDetailView: View {
             }
 
             Section("原始收发（最近 80 条）") {
+                Button {
+                    UIPasteboard.general.string = device.traffic.suffix(120).joined(separator: "\n")
+                } label: {
+                    Label("复制收发", systemImage: "doc.on.doc")
+                        .font(.caption)
+                }
+
                 if device.traffic.isEmpty {
                     Text("暂无数据").font(.caption).foregroundStyle(.secondary)
                 } else {
@@ -204,6 +211,13 @@ struct DeviceDetailView: View {
             }
 
             Section("日志") {
+                Button {
+                    UIPasteboard.general.string = device.logLines.suffix(120).joined(separator: "\n")
+                } label: {
+                    Label("复制日志", systemImage: "doc.on.doc")
+                        .font(.caption)
+                }
+
                 ForEach(Array(device.logLines.suffix(80).enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.caption2.monospaced())
