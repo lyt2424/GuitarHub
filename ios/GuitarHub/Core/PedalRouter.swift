@@ -88,11 +88,11 @@ final class PedalRouter: ObservableObject {
 
         case .ampPresetStep(let device, let delta):
             guard isActive(device) else { return skip(device) }
-            devices[device]?.stepPreset(delta)
+            devices[device]?.stepPreset(delta, source: "踏板")
 
         case .ampPreset(let device, let index):
             guard isActive(device) else { return skip(device) }
-            devices[device]?.selectPreset(index)
+            devices[device]?.selectPreset(index, source: "踏板")
 
         case .ampTapTempo(let device):
             guard isActive(device) else { return skip(device) }

@@ -165,6 +165,11 @@ final class SparkCodec: DeviceCodec {
     }
 
     private func apply(_ parsed: SparkPreset) {
+        // 空包（踏板数 0、名字空）通常是切换过程中的半包，不能拿来覆盖界面。
+        guard !parsed.pedals.isEmpty, !parsed.name.isEmpty else {
+            eventHandler?(.log("忽略空预设回报（踏板 \(parsed.pedals.count) 个）"))
+            return
+        }
         preset = parsed
         eventHandler?(.log("预设回报 curr=\(parsed.currentPreset) num=\(parsed.presetNumber) name=「\(parsed.name)」踏板=\(parsed.pedals.count)"))
         // 优先用“我们请求的那个号”，避免回包里的旧 curr 把界面带偏。

@@ -148,8 +148,9 @@ final class AmpDevice: ObservableObject, Identifiable {
         return max(profile.capabilities.presetCount, maxStored)
     }
 
-    func selectPreset(_ index: Int) {
+    func selectPreset(_ index: Int, source: String = "界面") {
         guard index >= 0 else { return }
+        log("切档请求[\(source)] → \(index + 1)")
 
         // 上一档还没确认回来：先记下最后一次目标，等确认后再执行，避免命令被音箱丢掉。
         if awaitingPresetResponse {
@@ -228,10 +229,10 @@ final class AmpDevice: ObservableObject, Identifiable {
         log("召回音色 \(index + 1)：\(presetName)")
     }
 
-    func stepPreset(_ delta: Int) {
+    func stepPreset(_ delta: Int, source: String = "界面") {
         let count = max(1, effectivePresetCount)
         let next = ((presetIndex + delta) % count + count) % count
-        selectPreset(next)
+        selectPreset(next, source: source)
     }
 
     /// 用户自定义显示名（中文）。清空则恢复设备/预设原名。
