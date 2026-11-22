@@ -16,7 +16,7 @@ struct RootView: View {
     }
 }
 
-// MARK: - 启动页：两个入口
+// MARK: - 启动页
 
 struct LaunchView: View {
     @EnvironmentObject private var hub: DeviceHub
@@ -29,9 +29,9 @@ struct LaunchView: View {
                 Theme.background.ignoresSafeArea()
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("吉他中枢")
+                        Text("舞台Control")
                             .font(.system(size: 34, weight: .bold))
-                        Text("选择今天的入口")
+                        Text("电吉他演出控制")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
