@@ -27,6 +27,18 @@ struct ModuleHostView: View {
                                 .font(.footnote)
                                 .buttonStyle(.borderedProminent)
                                 .tint(Theme.accent)
+
+                            if !host.discoveredComponents.isEmpty {
+                                Divider()
+                                Text("系统里已发现的 AUv3 组件：")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                ForEach(host.discoveredComponents, id: \.self) { line in
+                                    Text(line)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
                         }
                     }
                 } else {

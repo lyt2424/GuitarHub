@@ -13,6 +13,7 @@ final class ModuleAUHost: ObservableObject {
     @Published private(set) var currentIndex: Int = 0
     @Published private(set) var currentName = "—"
     @Published private(set) var parameters: [AUParameter] = []
+    @Published private(set) var discoveredComponents: [String] = []
 
     private let engine = AVAudioEngine()
     private var unit: AVAudioUnit?
@@ -29,19 +30,21 @@ final class ModuleAUHost: ObservableObject {
         guard !isReady else { return }
         status = "正在查找 KORG Module 插件…"
 
-        let description = AudioComponentDescription(
-            componentType: kAudioUnitType_MusicDevice,
-            componentSubType: 0,
-            componentManufacturer: 0,
-            componentFlags: 0,
-            componentFlagsMask: 0
-        )
-        let components = AVAudioUnitComponentManager.shared().components(matching: description)
-        guard let component = components.first(where: {
-            $0.name.localizedCaseInsensitiveContains("module")
-                || $0.manufacturerName.localizedCaseInsensitiveContains("korg")
-        }) else {
-            status = "没有找到 KORG Module 插件。请确认已在 App Store 安装 Module Pro。"
+        // 列出系统里所有 AUv3 组件，便于诊断。
+        let all = AVAudioUnitComponentManager.shared().components
+        discoveredComponents = all.map { "\($0.name) · \($0.manufacturerName)" }
+
+        let candidates = all.filter { component in
+            let name = component.name.lowercased()
+            let maker = component.manufacturerName.lowercased()
+            let isInstrument = component.audioComponentDescription.componentType == kAudioUnitType_MusicDevice
+            return isInstrument && (name.contains("module") || maker.contains("korg"))
+        }
+
+        // 同时装了免费版和 Pro 时，优先选名字带 Pro 的。
+        guard let component = candidates.first(where: { $0.name.lowercased().contains("pro") })
+                ?? candidates.first else {
+            status = "没有找到 KORG Module 插件。请确认装的是 Module Pro，并先打开它一次。"
             return
         }
 
