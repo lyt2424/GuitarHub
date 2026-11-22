@@ -32,8 +32,9 @@ final class ModuleAUHost: ObservableObject {
 
         // 列出系统里所有 AUv3 组件，便于诊断。
         // 注意：必须用 components(matching:)，直接写 .components 会和同名方法产生歧义。
+        // 全类型枚举：有些插件的注册类型不是 aumu，先全部列出来再筛。
         let query = AudioComponentDescription(
-            componentType: kAudioUnitType_MusicDevice,
+            componentType: 0,
             componentSubType: 0,
             componentManufacturer: 0,
             componentFlags: 0,
