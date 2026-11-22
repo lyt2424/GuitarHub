@@ -324,19 +324,22 @@ final class AmpDevice: ObservableObject, Identifiable {
             if let reason { lastError = reason }
         case .stateLoaded(let snap):
             presetIndex = snap.presetIndex
-            presetName = store.alias(profile.id, index: snap.presetIndex) ?? snap.name
+            presetName = store.alias(profile.id, index: snap.presetIndex)
+                ?? (profile.capabilities.stateReadback ? "预设 \(snap.presetIndex + 1)" : snap.name)
             modules = Self.merge(snapshot: snap.modules, profile: profile)
             scheduleCapture()
             log("已读取音色：\(snap.name)")
         case .presetName(let name):
+            guard !profile.capabilities.stateReadback else { return }
             presetName = store.alias(profile.id, index: presetIndex) ?? name
             scheduleCapture()
         case .presetIndex(let index):
             presetIndex = index
-            // 切档后立刻用自定义中文名，不等音色状态回传。
+            // 切档后立刻用槽位中文名，不等音色状态回传。
             presetName = store.alias(profile.id, index: index)
-                ?? store.snapshot(profile.id, index: index)?.name
-                ?? "音色 \(index + 1)"
+                ?? (profile.capabilities.stateReadback
+                    ? "预设 \(index + 1)"
+                    : store.snapshot(profile.id, index: index)?.name ?? "音色 \(index + 1)")
             store.setLastUsedPreset(index, for: profile.id)
         case .moduleChanged(let module, let enabled):
             setLocalModule(module, enabled: enabled)
