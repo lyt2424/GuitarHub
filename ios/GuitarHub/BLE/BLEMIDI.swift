@@ -11,27 +11,21 @@ enum BLEMIDI {
     static let characteristicUUID = CBUUID(string: "7772E5DB-3868-4112-A1A9-F2669D106BF3")
 
     /// 去掉 BLE MIDI 的头与时间戳，只留下纯 MIDI 字节流。
+    ///
+    /// 每个 BLE 通知通常是：包头(bit7=1) + 时间戳 + MIDI 消息。
+    /// 时间戳低字节按规范 bit7=0，但不少硬件（Chocolate 等）会发成 0x80–0xFF，
+    /// 不能按 bit7 判断，否则会把 MIDI 状态字节一起丢掉。
     static func decode(_ data: Data) -> [UInt8] {
         let bytes = [UInt8](data)
-        var out: [UInt8] = []
-        var index = 0
-        while index < bytes.count {
-            let header = bytes[index]
-            guard header & 0x80 != 0 else {
-                index += 1
-                continue
-            }
+        guard bytes.count > 2 else { return [] }
+
+        // 跳过包头和时间戳，从第一个 MIDI 状态字节开始。
+        var index = 2
+        while index < bytes.count, bytes[index] & 0x80 == 0 {
             index += 1
-            // 时间戳低字节
-            if index < bytes.count, bytes[index] & 0x80 == 0 {
-                index += 1
-            }
-            while index < bytes.count, bytes[index] & 0x80 == 0 {
-                out.append(bytes[index])
-                index += 1
-            }
         }
-        return out
+        guard index < bytes.count else { return [] }
+        return Array(bytes[index...])
     }
 
     /// 把纯 MIDI 字节封装成一个 BLE MIDI 包（时间戳取当前毫秒的低 13 位）。
