@@ -29,6 +29,7 @@ final class SparkCodec: DeviceCodec {
     private var pendingParamWork: [String: DispatchWorkItem] = [:]
     /// 主动读取某个预设时记下目标号；回包里的 curr 可能是旧值，不能拿来当显示号。
     private var expectedPresetIndex: Int?
+    private var presetRetryCount = 0
 
     init(profile: DeviceProfile, session: BLESession) {
         self.profile = profile
@@ -164,6 +165,13 @@ final class SparkCodec: DeviceCodec {
                 : parsed.presetNumber)
         if let expected = expectedPresetIndex, expected != parsed.currentPreset {
             eventHandler?(.log("音箱没切过去：目标 \(expected + 1)，实际 \(parsed.currentPreset + 1)"))
+            // 用真实当前档为基准，再补发一次目标档。
+            if presetRetryCount < 1 {
+                presetRetryCount += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.selectPreset(expected)
+                }
+            }
         }
         expectedPresetIndex = nil
         let index = min(max(0, rawIndex), max(0, profile.capabilities.presetCount - 1))
@@ -211,6 +219,7 @@ final class SparkCodec: DeviceCodec {
     func requestPreset(_ index: Int) {
         let target = min(max(0, index), max(0, profile.capabilities.presetCount - 1))
         expectedPresetIndex = target
+        presetRetryCount = 0
         var payload: [UInt8] = [0x00, UInt8(clamping: target)]
         payload.append(contentsOf: [UInt8](repeating: 0, count: 30))
         eventHandler?(.log("读取预设 \(target + 1) 的状态"))
