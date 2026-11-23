@@ -28,6 +28,7 @@ final class AmpDevice: ObservableObject, Identifiable {
     @Published private(set) var lastError: String?
     /// 最近一次收发的原始字节（十六进制），用于调试与逆向新设备。
     @Published private(set) var traffic: [String] = []
+    @Published private(set) var presetGroupCount: Int
 
     var id: String { profile.id }
     var isConnected: Bool { status.isConnected }
@@ -37,6 +38,9 @@ final class AmpDevice: ObservableObject, Identifiable {
         self.session = session
         self.codec = codec
         self.store = store
+        // Pulze 这类不能读回的设备：默认按 8 个算，用户可以在界面上改成组内真实数量。
+        self.presetGroupCount = store.library(profile.id).presetCount
+            ?? min(profile.capabilities.presetCount, 8)
 
         let lastIndex = store.library(profile.id).lastUsedPreset
         self.presetIndex = lastIndex
@@ -144,21 +148,22 @@ final class AmpDevice: ObservableObject, Identifiable {
         if profile.capabilities.stateReadback {
             return max(1, profile.capabilities.presetCount)
         }
-        let maxStored = (store.library(profile.id).snapshots.keys.max() ?? 0) + 1
-        return max(profile.capabilities.presetCount, maxStored)
+        return max(1, presetGroupCount)
     }
 
     func selectPreset(_ index: Int, source: String = "界面") {
         guard index >= 0 else { return }
+        let limit = max(1, effectivePresetCount)
+        let target = min(index, limit - 1)
         lastInteraction = Date()
         log("切档请求[\(source)] → \(index + 1)")
 
         // 不做排队：每次操作立即下发，保证手感；失败由后续校验/巡检补。
-        presetIndex = index
+        presetIndex = target
         lastError = nil
 
         if profile.capabilities.stateReadback {
-            codec.selectPreset(index)
+            codec.selectPreset(target)
             // 只保留最后一次读取：快速连踩时，旧请求的回包会把序号/模块带乱。
             presetReloadWork?.cancel()
             presetSelectionCounter += 1
@@ -168,7 +173,7 @@ final class AmpDevice: ObservableObject, Identifiable {
                 self.awaitingPresetCounter = counter
                 self.awaitingPresetResponse = true
                 if let spark = self.codec as? SparkCodec {
-                    spark.requestPreset(index)
+                    spark.requestPreset(target)
                 } else {
                     self.codec.requestState()
                 }
@@ -180,7 +185,7 @@ final class AmpDevice: ObservableObject, Identifiable {
             let retry = DispatchWorkItem { [weak self] in
                 guard let self, self.awaitingPresetResponse else { return }
                 if let spark = self.codec as? SparkCodec {
-                    spark.requestPreset(index)
+                    spark.requestPreset(target)
                 } else {
                     self.codec.requestState()
                 }
@@ -204,20 +209,20 @@ final class AmpDevice: ObservableObject, Identifiable {
             presetTimeoutWork = timeout
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2, execute: timeout)
 
-            store.setLastUsedPreset(index, for: profile.id)
+            store.setLastUsedPreset(target, for: profile.id)
             return
         }
 
-        codec.selectPreset(index)
+        codec.selectPreset(target)
 
         // 全局模块（音量等）不属于任何预设：切音色前后保持原值，也不参与整包下发。
         let globals = modules.filter { profile.module($0.id)?.isGlobal ?? false }
 
-        if let snap = store.snapshot(profile.id, index: index) {
-            presetName = store.alias(profile.id, index: index) ?? snap.name
+        if let snap = store.snapshot(profile.id, index: target) {
+            presetName = store.alias(profile.id, index: target) ?? snap.name
             modules = Self.merge(snapshot: snap.modules, profile: profile)
         } else {
-            presetName = store.alias(profile.id, index: index) ?? "音色 \(index + 1)"
+            presetName = store.alias(profile.id, index: target) ?? "音色 \(target + 1)"
             modules = profile.defaultModules
         }
         for saved in globals {
@@ -229,9 +234,26 @@ final class AmpDevice: ObservableObject, Identifiable {
         if store.data.settings.pushFullStateOnRecall {
             pushAll()
         }
-        store.setLastUsedPreset(index, for: profile.id)
+        store.setLastUsedPreset(target, for: profile.id)
         scheduleCapture()
-        log("召回音色 \(index + 1)：\(presetName)")
+        log("召回音色 \(target + 1)：\(presetName)")
+    }
+
+    /// 设置当前音色组里实际有几个音色（Pulze 这类无法读回的设备）。
+    func setPresetGroupCount(_ count: Int) {
+        let clamped = count.clamped(to: 1...128)
+        presetGroupCount = clamped
+        store.setPresetCount(clamped, for: profile.id)
+        if presetIndex >= clamped {
+            presetIndex = clamped - 1
+        }
+    }
+
+    /// 用户手动把音箱调到组内第 1 个后，点这个让 App 从第 1 个开始计数。
+    func syncPresetCounter() {
+        (codec as? MIDICodec)?.resetPresetCounter()
+        presetIndex = 0
+        presetName = displayName(at: 0)
     }
 
     func stepPreset(_ delta: Int, source: String = "界面") {

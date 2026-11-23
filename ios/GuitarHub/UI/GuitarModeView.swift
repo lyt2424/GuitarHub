@@ -262,7 +262,7 @@ private struct GuitarDeviceView: View {
                         .font(.caption)
                         .foregroundStyle(device.status.isConnected ? Theme.onColor : .secondary)
                     Spacer()
-                    Text("预设 \(device.presetIndex + 1) / \(min(8, device.effectivePresetCount))")
+                    Text("预设 \(device.presetIndex + 1) / \(device.effectivePresetCount)")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -311,6 +311,30 @@ private struct GuitarDeviceView: View {
     private var presetFold: some View {
         Card {
             DisclosureGroup(isExpanded: $presetsExpanded) {
+                HStack {
+                    Text("组内音色数")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Stepper("\(device.presetGroupCount)",
+                            value: Binding(
+                                get: { device.presetGroupCount },
+                                set: { device.setPresetGroupCount($0) }
+                            ),
+                            in: 1...128)
+                        .font(.footnote)
+                }
+                .padding(.top, 8)
+
+                Button {
+                    device.syncPresetCounter()
+                } label: {
+                    Label("音箱已手动调到第 1 个，点此归零", systemImage: "arrow.counterclockwise")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
                           spacing: 8) {
                     ForEach(0..<min(8, device.effectivePresetCount), id: \.self) { index in

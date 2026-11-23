@@ -62,6 +62,12 @@ final class MIDICodec: DeviceCodec {
 
     // MARK: - 控制
 
+    /// 让 App 的“当前音色号”归零（用户先把音箱手动调到组内第 1 个，再点同步）。
+    func resetPresetCounter() {
+        lastProgram = 0
+        eventHandler?(.log("预设计数已归零"))
+    }
+
     func selectPreset(_ index: Int) {
         let clamped = index.clamped(to: 0...127)
         // 优先用设备手册里明确支持的 CC 上/下一个；没有配置才退回 Program Change。

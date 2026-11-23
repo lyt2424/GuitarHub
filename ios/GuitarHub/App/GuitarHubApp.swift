@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct GuitarHubApp: App {
@@ -12,6 +13,7 @@ struct GuitarHubApp: App {
                 .preferredColorScheme(.dark)
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
+                        UIApplication.shared.isIdleTimerDisabled = true
                         hub.onAppActive()
                     }
                 }

@@ -85,7 +85,11 @@ struct LaunchView: View {
             .sheet(isPresented: $showDevices) {
                 DeviceView().environmentObject(hub)
             }
-            .onAppear { hub.prepareAutoConnect() }
+            .onAppear {
+                // 演出时不要自动息屏
+                UIApplication.shared.isIdleTimerDisabled = true
+                hub.prepareAutoConnect()
+            }
         }
     }
 }

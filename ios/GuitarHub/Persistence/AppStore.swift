@@ -22,8 +22,10 @@ final class AppStore: ObservableObject {
         var lastUsedPreset: Int = 0
         /// 用户自己起的显示名（中文），优先级高于设备上报的名字。
         var aliases: [Int: String] = [:]
+        /// 设备当前音色组里实际有几个音色（Pulze 这类不能读回的设备需要手动告诉 App）。
+        var presetCount: Int?
 
-        enum CodingKeys: String, CodingKey { case snapshots, lastUsedPreset, aliases }
+        enum CodingKeys: String, CodingKey { case snapshots, lastUsedPreset, aliases, presetCount }
 
         init() {}
 
@@ -32,6 +34,7 @@ final class AppStore: ObservableObject {
             snapshots = (try? c.decode([Int: AmpSnapshot].self, forKey: .snapshots)) ?? [:]
             lastUsedPreset = (try? c.decode(Int.self, forKey: .lastUsedPreset)) ?? 0
             aliases = (try? c.decode([Int: String].self, forKey: .aliases)) ?? [:]
+            presetCount = try? c.decodeIfPresent(Int.self, forKey: .presetCount)
         }
     }
 
@@ -152,6 +155,12 @@ final class AppStore: ObservableObject {
         } else {
             lib.aliases.removeValue(forKey: index)
         }
+        data.libraries[kind] = lib
+    }
+
+    func setPresetCount(_ count: Int, for kind: DeviceProfileID) {
+        var lib = library(kind)
+        lib.presetCount = max(1, min(128, count))
         data.libraries[kind] = lib
     }
 
