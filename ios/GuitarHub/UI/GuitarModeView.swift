@@ -86,6 +86,8 @@ private struct GuitarDeviceView: View {
     @State private var tappedBPM: Double?
     @State private var renameIndex: Int?
     @State private var renamingPreset = false
+    @State private var showParams = false
+    @State private var presetsExpanded = false
 
     var body: some View {
         ScrollView {
@@ -93,11 +95,10 @@ private struct GuitarDeviceView: View {
                 if device.profile.id == "spark-mini" {
                     sparkSimpleCard
                 } else {
-                    presetCard
+                    pulzeHero
                     moduleGrid
+                    presetFold
                     drumPanel
-                    globalPanel
-                    parameterPanel
                 }
             }
             .padding(14)
@@ -106,6 +107,21 @@ private struct GuitarDeviceView: View {
         .sheet(isPresented: $showPresets) {
             PresetListSheet(device: device) { index in
                 device.selectPreset(index)
+            }
+        }
+        .sheet(isPresented: $showParams) {
+            NavigationStack {
+                ScrollView {
+                    parameterPanel.padding(14)
+                }
+                .background(Theme.page.ignoresSafeArea())
+                .navigationTitle(activeModule.flatMap { device.profile.module($0)?.name } ?? "参数")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { showParams = false }
+                    }
+                }
             }
         }
         .alert("音色显示名", isPresented: $renaming) {
@@ -233,6 +249,105 @@ private struct GuitarDeviceView: View {
                     device.renamePreset(draftName, at: index)
                 }
             }
+        }
+    }
+
+    // MARK: - Pulze 主界面：大字音色名 + 7 模块 + 折叠预设 + 鼓机
+
+    private var pulzeHero: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(device.status.label)
+                        .font(.caption)
+                        .foregroundStyle(device.status.isConnected ? Theme.onColor : .secondary)
+                    Spacer()
+                    Text("预设 \(device.presetIndex + 1) / \(min(8, device.effectivePresetCount))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(device.presetName)
+                        .font(.system(size: 54, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.35)
+                        .lineLimit(1)
+                    Button {
+                        draftName = device.presetName
+                        renaming = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 10) {
+                    iconButton("chevron.left") { device.stepPreset(-1) }
+                    iconButton("chevron.right") { device.stepPreset(1) }
+                    iconButton("arrow.clockwise", size: 16) { device.requestState() }
+                    Spacer(minLength: 0)
+                }
+
+                if !device.status.isConnected {
+                    Button {
+                        if device.isScanning { device.stopScan() } else { device.startScan() }
+                    } label: {
+                        Label(device.isScanning ? "搜索中…" : "搜索并连接 \(device.profile.name)",
+                              systemImage: "dot.radiowaves.left.and.right")
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Theme.cardHigh, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var presetFold: some View {
+        Card {
+            DisclosureGroup(isExpanded: $presetsExpanded) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
+                          spacing: 8) {
+                    ForEach(0..<min(8, device.effectivePresetCount), id: \.self) { index in
+                        Button {
+                            device.selectPreset(index)
+                        } label: {
+                            Text(device.displayName(at: index))
+                                .font(.footnote.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 40)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 9)
+                                        .fill(index == device.presetIndex
+                                              ? Theme.accent.opacity(0.85)
+                                              : Theme.cardHigh)
+                                )
+                                .foregroundStyle(index == device.presetIndex ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack {
+                    Text("预设 1–\(min(8, device.effectivePresetCount))")
+                        .font(.headline)
+                    Spacer()
+                    if !presetsExpanded {
+                        Text(device.presetName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .tint(.primary)
         }
     }
 
@@ -568,6 +683,7 @@ private struct GuitarDeviceView: View {
                         },
                         onEdit: {
                             selectedModule = state.id
+                            showParams = true
                         }
                     )
                 }
