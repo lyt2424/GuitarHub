@@ -346,6 +346,16 @@ private struct GuitarDeviceView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 
+                // 现场排查：绕过切档逻辑，直接发一条原始 CC。
+                HStack(spacing: 8) {
+                    Button("直接发 CC27=127") { device.sendCC(27, 127) }
+                        .font(.caption2)
+                        .buttonStyle(.bordered)
+                    Button("直接发 CC26=127") { device.sendCC(26, 127) }
+                        .font(.caption2)
+                        .buttonStyle(.bordered)
+                }
+
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
                           spacing: 8) {
                     ForEach(0..<min(8, device.effectivePresetCount), id: \.self) { index in
