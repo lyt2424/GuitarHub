@@ -326,6 +326,17 @@ private struct GuitarDeviceView: View {
                 }
                 .padding(.top, 8)
 
+                Picker("换音色发送", selection: Binding(
+                    get: { UserDefaults.standard.string(forKey: "preset.trigger.mode") ?? "cc127" },
+                    set: { UserDefaults.standard.set($0, forKey: "preset.trigger.mode") }
+                )) {
+                    Text("CC 值 127").tag("cc127")
+                    Text("CC 值 0").tag("cc0")
+                    Text("Program Change").tag("pc")
+                }
+                .pickerStyle(.segmented)
+                .font(.caption2)
+
                 Button {
                     device.syncPresetCounter()
                 } label: {

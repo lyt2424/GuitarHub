@@ -71,25 +71,30 @@ final class MIDICodec: DeviceCodec {
     func selectPreset(_ index: Int) {
         let clamped = index.clamped(to: 0...127)
 
-        // Pulze 这类设备：CC 只移动列表光标，用 PC 才真正加载音色。
-        if profile.presets.useProgramChange == true {
+        // 换音色发送方式可在界面上切换，方便现场确认设备认哪种。
+        let mode = UserDefaults.standard.string(forKey: "preset.trigger.mode") ?? "cc127"
+        if mode == "pc" {
             lastProgram = clamped
             sendProgramChange(clamped)
             eventHandler?(.log("→ PC #\(clamped + 1) 加载音色"))
             return
         }
 
-        // 其他设备按手册用 CC 上/下一个。
         if let next = profile.presets.stepCCNext, let prev = profile.presets.stepCCPrev {
             var delta = clamped - lastProgram
             if delta > 64 { delta -= 128 }
             if delta < -64 { delta += 128 }
             let cc = delta >= 0 ? next : prev
-            for _ in 0..<abs(delta) {
-                sendCC(cc, 127)
+            let stepValue = mode == "cc0" ? 0 : 127
+            let count = abs(delta)
+            for index in 0..<count {
+                // 大步跳转时按 45ms 间隔发，避免音箱把连发命令丢掉。
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.045) { [weak self] in
+                    self?.sendCC(cc, stepValue)
+                }
             }
             lastProgram = clamped
-            eventHandler?(.log("→ 换音色：CC \(cc) × \(abs(delta))，目标 #\(clamped + 1)"))
+            eventHandler?(.log("→ 换音色：CC \(cc)×\(count) 值 \(stepValue)，目标 #\(clamped + 1)"))
         } else {
             lastProgram = clamped
             sendProgramChange(clamped)
