@@ -71,21 +71,12 @@ final class MIDICodec: DeviceCodec {
     func selectPreset(_ index: Int) {
         let clamped = index.clamped(to: 0...127)
 
-        // 换音色发送方式可在界面上切换，方便现场确认设备认哪种。
-        let mode = UserDefaults.standard.string(forKey: "preset.trigger.mode") ?? "cc127"
-        if mode == "pc" {
-            lastProgram = clamped
-            sendProgramChange(clamped)
-            eventHandler?(.log("→ PC #\(clamped + 1) 加载音色"))
-            return
-        }
-
         if let next = profile.presets.stepCCNext, let prev = profile.presets.stepCCPrev {
             var delta = clamped - lastProgram
             if delta > 64 { delta -= 128 }
             if delta < -64 { delta += 128 }
             let cc = delta >= 0 ? next : prev
-            let stepValue = mode == "cc0" ? 0 : 127
+            let stepValue = 127
             let count = abs(delta)
             for index in 0..<count {
                 // 大步跳转时按 45ms 间隔发，避免音箱把连发命令丢掉。

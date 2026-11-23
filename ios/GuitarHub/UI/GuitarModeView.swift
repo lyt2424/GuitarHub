@@ -326,17 +326,6 @@ private struct GuitarDeviceView: View {
                 }
                 .padding(.top, 8)
 
-                Picker("换音色发送", selection: Binding(
-                    get: { UserDefaults.standard.string(forKey: "preset.trigger.mode") ?? "cc127" },
-                    set: { UserDefaults.standard.set($0, forKey: "preset.trigger.mode") }
-                )) {
-                    Text("CC 值 127").tag("cc127")
-                    Text("CC 值 0").tag("cc0")
-                    Text("Program Change").tag("pc")
-                }
-                .pickerStyle(.segmented)
-                .font(.caption2)
-
                 Button {
                     device.syncPresetCounter()
                 } label: {
@@ -346,19 +335,9 @@ private struct GuitarDeviceView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 
-                // 现场排查：绕过切档逻辑，直接发一条原始 CC。
-                HStack(spacing: 8) {
-                    Button("直接发 CC27=127") { device.sendCC(27, 127) }
-                        .font(.caption2)
-                        .buttonStyle(.bordered)
-                    Button("直接发 CC26=127") { device.sendCC(26, 127) }
-                        .font(.caption2)
-                        .buttonStyle(.bordered)
-                }
-
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
                           spacing: 8) {
-                    ForEach(0..<min(8, device.effectivePresetCount), id: \.self) { index in
+                    ForEach(0..<device.effectivePresetCount, id: \.self) { index in
                         Button {
                             device.selectPreset(index)
                         } label: {
@@ -382,7 +361,7 @@ private struct GuitarDeviceView: View {
                 .padding(.top, 8)
             } label: {
                 HStack {
-                    Text("预设 1–\(min(8, device.effectivePresetCount))")
+                    Text("预设 1–\(device.effectivePresetCount)")
                         .font(.headline)
                     Spacer()
                     if !presetsExpanded {

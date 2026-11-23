@@ -7,8 +7,6 @@ final class AppStore: ObservableObject {
 
     struct Settings: Codable, Hashable {
         var sparkPresetCount: Int = 4
-        /// Pulze 换音色发送方式："cc127" / "cc0" / "pc"
-        var presetTriggerMode: String? = nil
         var hapticsEnabled: Bool = true
         /// 召回音色时是否把本地保存的模块状态整包推给设备。
         var pushFullStateOnRecall: Bool = true
