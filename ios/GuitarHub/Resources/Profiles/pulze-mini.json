@@ -27,7 +27,8 @@
     "startNumber": 0,
     "wrap": true,
     "stepCCNext": 27,
-    "stepCCPrev": 26
+    "stepCCPrev": 26,
+    "useProgramChange": true
   },
   "modules": [
     {

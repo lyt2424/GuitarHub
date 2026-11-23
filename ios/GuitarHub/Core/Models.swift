@@ -130,8 +130,10 @@ struct DeviceProfile: Identifiable, Codable, Hashable {
         /// 有些设备不支持 PC 换音色，只认 CC“上一个/下一个”。
         var stepCCNext: Int? = nil
         var stepCCPrev: Int? = nil
+        /// 某些设备（Pulze）的 CC 只移动列表光标，真正加载音色要用 Program Change。
+        var useProgramChange: Bool? = nil
 
-        enum CodingKeys: String, CodingKey { case startNumber, wrap, stepCCNext, stepCCPrev }
+        enum CodingKeys: String, CodingKey { case startNumber, wrap, stepCCNext, stepCCPrev, useProgramChange }
 
         init() {}
 
@@ -141,6 +143,7 @@ struct DeviceProfile: Identifiable, Codable, Hashable {
             wrap = c.value(.wrap, default: true)
             stepCCNext = c.optional(.stepCCNext)
             stepCCPrev = c.optional(.stepCCPrev)
+            useProgramChange = c.optional(.useProgramChange)
         }
     }
 

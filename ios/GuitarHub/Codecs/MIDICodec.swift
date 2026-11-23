@@ -70,7 +70,16 @@ final class MIDICodec: DeviceCodec {
 
     func selectPreset(_ index: Int) {
         let clamped = index.clamped(to: 0...127)
-        // 优先用设备手册里明确支持的 CC 上/下一个；没有配置才退回 Program Change。
+
+        // Pulze 这类设备：CC 只移动列表光标，用 PC 才真正加载音色。
+        if profile.presets.useProgramChange == true {
+            lastProgram = clamped
+            sendProgramChange(clamped)
+            eventHandler?(.log("→ PC #\(clamped + 1) 加载音色"))
+            return
+        }
+
+        // 其他设备按手册用 CC 上/下一个。
         if let next = profile.presets.stepCCNext, let prev = profile.presets.stepCCPrev {
             var delta = clamped - lastProgram
             if delta > 64 { delta -= 128 }
