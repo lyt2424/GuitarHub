@@ -231,11 +231,16 @@ final class AmpDevice: ObservableObject, Identifiable {
             }
         }
 
-        if store.data.settings.pushFullStateOnRecall {
+        // Pulze 这类用 CC 切档的设备：音箱自己的音色才是准的，
+        // 本地快照整包下发会把刚召回的模块/参数覆盖掉，导致“名字变了声音没变”。
+        let usesStepCC = profile.presets.stepCCNext != nil || profile.presets.stepCCPrev != nil
+        if store.data.settings.pushFullStateOnRecall && !usesStepCC {
             pushAll()
         }
         store.setLastUsedPreset(target, for: profile.id)
-        scheduleCapture()
+        if !usesStepCC {
+            scheduleCapture()
+        }
         log("召回音色 \(target + 1)：\(presetName)")
     }
 
